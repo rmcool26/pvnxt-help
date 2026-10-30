@@ -16,14 +16,6 @@
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   };
   function user() { return store.get('pvh_user', null); }
-  function photoSrc(key, w) { var p = H.photos[key]; return 'https://images.unsplash.com/' + p.id + '?auto=format&fit=crop&w=' + (w || 1200) + '&q=75'; }
-  function img(key, w, cls, alt) {
-    var p = H.photos[key];
-    return '<img class="' + (cls || '') + '" src="' + photoSrc(key, w) + '" alt="' + esc(alt != null ? alt : p.alt) + '" loading="lazy" data-fb="assets/images/' + p.local + '">';
-  }
-  function credit(key) { var p = H.photos[key]; return 'Photo: <a href="https://unsplash.com/@' + p.user + '?utm_source=pvnxt_help&utm_medium=referral" target="_blank" rel="noopener">' + esc(p.by) + '</a> on <a href="https://unsplash.com/?utm_source=pvnxt_help&utm_medium=referral" target="_blank" rel="noopener">Unsplash</a>'; }
-  /* if Unsplash can't load, fall back to the local product image */
-  document.addEventListener('error', function (e) { var t = e.target; if (t && t.dataset && t.dataset.fb && !t.dataset.fbd) { t.dataset.fbd = 1; t.src = t.dataset.fb; var fig = t.closest('figure'), cap = fig && fig.querySelector('figcaption'); if (cap) cap.hidden = true; } }, true);
   function set(html) { main.innerHTML = html; icons(); }
   function icons() { if (window.lucide) window.lucide.createIcons(); }
   function title(t) { document.title = t ? t + ' | pvNXT Help' : 'pvNXT Help'; }
@@ -46,22 +38,51 @@
   function searchBox(opts) {
     opts = opts || {};
     var sel = opts.select ? '<label class="sr" for="sb-p">Portal</label><select id="sb-p" name="p" class="sb-sel"><option value="all">All portals</option>' + H.portals.map(function (p) { return '<option value="' + p.id + '"' + (opts.p === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select>' : (opts.p ? '<input type="hidden" name="p" value="' + opts.p + '">' : '');
-    return '<form class="sbox' + (opts.big ? ' big' : '') + '" action="search.html" role="search" data-suggest>'
-      + ic('search', 'sb-i') + '<label class="sr" for="sb-q">Search help</label><input id="sb-q" name="q" type="search" autocomplete="off" placeholder="' + esc(opts.ph || 'Describe your issue, e.g. “BOQ not updating”') + '" value="' + esc(opts.q || '') + '">'
-      + sel + '<button class="btn" type="submit">Search</button><div class="sugg" role="listbox" hidden></div></form>';
+    var n = ++searchBox.n;
+    return '<form class="sbox' + (opts.big ? ' big' : '') + '" action="search.html" role="search" data-suggest' + (opts.rotate ? ' data-rotate="' + esc(opts.rotate) + '"' : '') + '>'
+      + ic('search', 'sb-i') + '<label class="sr" for="sb-q' + n + '">Search help</label><input id="sb-q' + n + '" name="q" type="search" autocomplete="off" placeholder="' + esc(opts.ph || 'Describe your issue, e.g. “BOQ not updating”') + '" value="' + esc(opts.q || '') + '">'
+      + sel + '<button class="btn" type="submit">Search</button><div class="sugg" hidden></div></form>';
   }
+  searchBox.n = 0;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Search suggestions: live match count, arrow-key navigation, and a route to support when nothing matches */
   function wireSuggest() {
     [].forEach.call(document.querySelectorAll('[data-suggest]'), function (f) {
+      if (f.dataset.wired) return; f.dataset.wired = '1';
       var inp = f.querySelector('input[name=q]'), box = f.querySelector('.sugg'), sel = f.querySelector('[name=p]');
+      var bid = 'sugg-' + Math.random().toString(36).slice(2, 8);
+      box.id = bid; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', 'Matching guides');
+      inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', bid); inp.setAttribute('aria-expanded', 'false');
+      function hide() { box.hidden = true; inp.setAttribute('aria-expanded', 'false'); }
       function draw() {
-        var r = search(inp.value, sel && sel.value).a.slice(0, 6);
-        if (!inp.value.trim() || !r.length) { box.hidden = true; return; }
-        box.innerHTML = r.map(function (a) { return '<a role="option" href="article.html?a=' + a.id + '"><b>' + esc(a.title) + '</b><span>' + esc(P(a.p).name) + ' · ' + esc(a.sum) + '</span></a>'; }).join('') + '<a class="sugg-all" href="search.html?q=' + encodeURIComponent(inp.value) + '">See all results ' + arrow() + '</a>';
-        box.hidden = false; icons();
+        var q = inp.value.trim(); if (!q) { hide(); return; }
+        var all = search(q, sel && sel.value).a, r = all.slice(0, 6);
+        box.innerHTML = '<span class="sugg-n" role="status">' + (all.length ? all.length + (all.length === 1 ? ' guide matches' : ' guides match') : 'No guide matches yet') + '</span>'
+          + r.map(function (a) { return '<a role="option" href="article.html?a=' + a.id + '"><b>' + esc(a.title) + '</b><span>' + esc(P(a.p).name) + ' · ' + esc(a.sum) + '</span></a>'; }).join('')
+          + (all.length ? '<a class="sugg-all" href="search.html?q=' + encodeURIComponent(q) + '">See all results ' + arrow() + '</a>'
+            : '<a class="sugg-all" href="contact.html?topic=' + encodeURIComponent(q) + '">Ask support about “' + esc(q) + '” ' + arrow() + '</a>');
+        box.hidden = false; inp.setAttribute('aria-expanded', 'true'); icons();
       }
-      inp.addEventListener('input', draw); if (sel) sel.addEventListener('change', draw);
-      inp.addEventListener('keydown', function (e) { if (e.key === 'Escape') box.hidden = true; });
-      document.addEventListener('click', function (e) { if (!f.contains(e.target)) box.hidden = true; });
+      inp.addEventListener('input', draw);
+      inp.addEventListener('focus', function () { if (inp.value.trim()) draw(); });
+      if (sel) sel.addEventListener('change', draw);
+      f.addEventListener('keydown', function (e) {
+        var o = [].slice.call(box.querySelectorAll('a')), i = o.indexOf(document.activeElement);
+        if (e.key === 'Escape') { inp.focus(); hide(); return; }
+        if (box.hidden || !o.length) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); (o[i + 1] || o[0]).focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); if (i <= 0) inp.focus(); else o[i - 1].focus(); }
+      });
+      document.addEventListener('click', function (e) { if (!f.contains(e.target)) hide(); });
+      /* rotating example searches show what the guides cover; they stop while the visitor types */
+      if (f.dataset.rotate && !reduce) {
+        var ex = f.dataset.rotate.split('|'), k = 0;
+        setInterval(function () {
+          if (document.activeElement === inp || inp.value || document.hidden) return;
+          k = (k + 1) % ex.length; inp.classList.add('ph-out');
+          setTimeout(function () { inp.placeholder = 'Try “' + ex[k] + '”'; inp.classList.remove('ph-out'); }, 220);
+        }, 3200);
+      }
     });
   }
 
@@ -74,7 +95,7 @@
     var acct = u
       ? '<div class="has-dd umenu"><button type="button" aria-haspopup="true" aria-expanded="false" class="ubtn"><span class="avatar">' + esc(initials) + '</span><span class="uname">' + esc((u.name || u.email).split(' ')[0]) + '</span>' + chev + '</button><div class="dd dd-user"><div class="dd-who"><b>' + esc(u.name || 'Signed in') + '</b><span>' + esc(u.email) + '</span></div><a class="item" href="my.html">' + ic('layout-dashboard') + 'My help</a><a class="item" href="my.html#requests">' + ic('inbox') + 'My requests</a><a class="item" href="my.html#saved">' + ic('bookmark') + 'Saved guides</a><a class="item" href="my.html#learning">' + ic('graduation-cap') + 'Learning paths</a><button type="button" class="item" data-signout>' + ic('log-out') + 'Sign out</button></div></div>'
       : '<a class="btn sm ghost" href="signin.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) + '">' + ic('log-in') + 'Sign in</a>';
-    var hs = page === 'home' ? '' : '<form class="hsearch" action="search.html" role="search">' + ic('search') + '<label class="sr" for="hq">Search help</label><input id="hq" name="q" type="search" placeholder="Search help" value="' + esc(page === 'search' ? (qs('q') || '') : '') + '"></form>';
+    var hs = page === 'home' || page === 'search' ? '' : '<form class="hsearch" action="search.html" role="search" data-suggest>' + ic('search') + '<label class="sr" for="hq">Search help</label><input id="hq" name="q" type="search" autocomplete="off" placeholder="Search help"><kbd class="kbd" aria-hidden="true">/</kbd><div class="sugg" hidden></div></form>';
     var h = '<header class="hdr" id="hdr"><div class="wrap hdr-in">'
       + '<a class="logo hlogo" href="index.html" aria-label="pvNXT Help home"><img src="assets/logos/terranxt.png" alt="Terranxt"><span class="hl-name">pvNXT <b>Help</b></span></a>'
       + '<ul class="nav">'
@@ -84,7 +105,7 @@
       + '<li><a href="status.html"' + on('status') + '>Status</a></li></ul>'
       + hs + '<div class="hdr-cta">' + acct + '<a class="btn sm" href="contact.html">Get support</a></div>'
       + '<button class="burger" id="burger" aria-label="Menu" aria-expanded="false">' + ic('menu') + '</button></div>'
-      + '<nav class="mnav" aria-label="Mobile">' + '<form class="hsearch m" action="search.html" role="search">' + ic('search') + '<label class="sr" for="mq">Search help</label><input id="mq" name="q" type="search" placeholder="Search help"></form>'
+      + '<nav class="mnav" aria-label="Mobile">' + '<form class="hsearch m" action="search.html" role="search" data-suggest>' + ic('search') + '<label class="sr" for="mq">Search help</label><input id="mq" name="q" type="search" autocomplete="off" placeholder="Search help"><div class="sugg" hidden></div></form>'
       + '<a href="index.html">Help home</a><div class="sub">' + H.portals.map(function (p) { return '<a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a>'; }).join('') + '</div>'
       + '<a href="videos.html">Videos</a><a href="contact.html">Contact</a><a href="status.html">Status</a>'
       + (u ? '<a href="my.html">My help</a><button type="button" class="mlink" data-signout>Sign out</button>' : '<a href="signin.html">Sign in</a>')
@@ -92,12 +113,12 @@
 
     var used = {}; [].forEach.call(document.querySelectorAll('[data-credit]'), function () { });
     var f = '<footer class="ftr"><div class="wrap ftr-main"><div class="ftr-cols">'
-      + '<div class="ftr-brand"><a class="logo" href="index.html"><img src="assets/logos/terranxt.png" alt="Terranxt"></a><p class="ftr-tag">pvNXT Help. Answers for every portal.</p><address>' + esc(H.support.hours) + '<br><a href="mailto:' + H.support.email + '">' + H.support.email + '</a><br>' + esc(H.support.reply) + '</address></div>'
+      + '<div class="ftr-brand"><a class="logo" href="index.html"><img src="assets/logos/terranxt.png" alt="Terranxt"></a><p class="ftr-tag">Guides for Studio, Go, Connect, SCADA and Artha.</p><address>' + esc(H.support.hours) + '<br><a href="mailto:' + H.support.email + '">' + H.support.email + '</a><br>' + esc(H.support.reply) + '</address></div>'
       + '<div><h6>Portals</h6><ul>' + H.portals.slice(0, 6).map(function (p) { return '<li><a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a></li>'; }).join('') + '</ul></div>'
       + '<div><h6>Help</h6><ul><li><a href="portal.html?p=account">Account &amp; security</a></li><li><a href="portal.html?p=apps">Mobile apps</a></li><li><a href="videos.html">Videos</a></li><li><a href="status.html">Status</a></li><li><a href="contact.html">Contact support</a></li></ul></div>'
       + '<div><h6>You</h6><ul>' + (user() ? '<li><a href="my.html">My help</a></li><li><a href="my.html#requests">My requests</a></li><li><a href="my.html#saved">Saved guides</a></li>' : '<li><a href="signin.html">Sign in</a></li>') + '</ul></div>'
       + '<div><h6>Terranxt</h6><ul><li><a href="' + H.support.site + '" target="_blank" rel="noopener">terranxt.com</a></li><li><a href="' + H.support.site + '/how-it-works.html" target="_blank" rel="noopener">How it works</a></li><li><a href="' + H.support.demo + '" target="_blank" rel="noopener">Request a demo</a></li><li><a href="' + H.support.site + '/privacy.html" target="_blank" rel="noopener">Privacy</a></li><li><a href="' + H.support.site + '/terms.html" target="_blank" rel="noopener">Terms</a></li></ul></div>'
-      + '</div><div class="ftr-base"><span>© ' + new Date().getFullYear() + ' Terranxt Pvt Ltd. A pvNXT company. IIT Delhi–FITT incubated. Backed by Astongreens.</span><span class="ftr-credit">Photos from <a href="https://unsplash.com/?utm_source=pvnxt_help&utm_medium=referral" target="_blank" rel="noopener">Unsplash</a> by ' + Object.keys(H.photos).map(function (k) { var p = H.photos[k]; return '<a href="https://unsplash.com/@' + p.user + '?utm_source=pvnxt_help&utm_medium=referral" target="_blank" rel="noopener">' + esc(p.by) + '</a>'; }).join(', ') + '.</span></div></div></footer>';
+      + '</div><div class="ftr-base"><span>© ' + new Date().getFullYear() + ' Terranxt Pvt Ltd. A pvNXT company. IIT Delhi–FITT incubated. Backed by Astongreens.</span><span>Screenshots are from the live portals. Personal details are blurred.</span></div></div></footer>';
 
     document.getElementById('site-header').outerHTML = h;
     document.getElementById('site-footer').outerHTML = f;
@@ -107,13 +128,27 @@
     function setOpen(el, v) { el.classList.toggle('open', v); var bt = el.querySelector('button'); if (bt) bt.setAttribute('aria-expanded', v); }
     function closeAll(x) { dds.forEach(function (d) { if (d !== x) setOpen(d, false); }); }
     dds.forEach(function (d) {
-      d.addEventListener('mouseenter', function () { if (!matchMedia('(hover:hover)').matches) return; clearTimeout(timers.get(d)); closeAll(d); setOpen(d, true); });
-      d.addEventListener('mouseleave', function () { timers.set(d, setTimeout(function () { setOpen(d, false); }, 160)); });
-      d.querySelector('button').addEventListener('click', function (e) { e.stopPropagation(); var o = !d.classList.contains('open'); closeAll(d); setOpen(d, o); });
+      /* hover intent: a passing cursor doesn't flick the menu open */
+      d.addEventListener('mouseenter', function () { if (!matchMedia('(hover:hover)').matches) return; clearTimeout(timers.get(d)); timers.set(d, setTimeout(function () { closeAll(d); setOpen(d, true); }, 140)); });
+      d.addEventListener('mouseleave', function () { clearTimeout(timers.get(d)); timers.set(d, setTimeout(function () { setOpen(d, false); }, 220)); });
+      d.querySelector('button').addEventListener('click', function (e) { e.stopPropagation(); clearTimeout(timers.get(d)); var o = !d.classList.contains('open'); closeAll(d); setOpen(d, o); if (o && e.detail === 0) { var f = d.querySelector('.dd a, .dd button'); if (f) f.focus(); } });
       d.addEventListener('focusout', function (e) { if (!d.contains(e.relatedTarget)) setOpen(d, false); });
+      /* arrow keys move through the open menu */
+      d.addEventListener('keydown', function (e) {
+        if (!d.classList.contains('open') || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+        var it = [].slice.call(d.querySelectorAll('.dd a, .dd button')), i = it.indexOf(document.activeElement);
+        e.preventDefault(); (e.key === 'ArrowDown' ? it[i + 1] || it[0] : it[i - 1] || it[it.length - 1]).focus();
+      });
     });
     document.addEventListener('click', function (e) { if (!e.target.closest('.has-dd')) closeAll(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { var o = document.querySelector('.has-dd.open'); closeAll(); if (o) o.querySelector('button').focus(); if (hd.classList.contains('open')) { hd.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); b.focus(); } }
+      /* "/" jumps to search, unless the visitor is typing */
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') && !document.activeElement.isContentEditable) {
+        var s = [].slice.call(document.querySelectorAll('input[name=q]')).filter(function (x) { return x.offsetParent; })[0];
+        if (s) { e.preventDefault(); s.focus(); s.select(); }
+      }
+    });
     [].forEach.call(document.querySelectorAll('[data-signout]'), function (x) { x.addEventListener('click', function () { try { localStorage.removeItem('pvh_user'); } catch (e) { } location.href = 'index.html'; }); });
     /* skip link, WhatsApp, back to top (same as terranxt.com) */
     var sk = document.createElement('a'); sk.className = 'skip'; sk.href = '#main'; sk.textContent = 'Skip to content'; document.body.insertBefore(sk, document.body.firstChild);
@@ -126,16 +161,18 @@
   }
 
   /* ---------- shared blocks ---------- */
-  function portalTile(p) {
-    var n = inPortal(p.id).length;
-    return '<a class="ptile" href="portal.html?p=' + p.id + '"><div class="ptile-top"><span class="pic">' + ic(p.icon) + '</span>' + pill(p.tag) + '</div><b>' + esc(p.name) + '</b><span class="ptile-l">' + esc(p.line) + '</span><span class="ptile-m">' + (p.host ? '<span class="host">' + p.host + '</span>' : '<span class="host">' + esc(p.who) + '</span>') + '<span class="cnt">' + n + ' guide' + (n === 1 ? '' : 's') + '</span></span></a>';
-  }
+  function names(list) { var n = list.map(function (p) { return p.name; }); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n.join(''); }
+  function shot(src, cls, alt) { return src ? '<img class="' + (cls || '') + '" src="' + src + '" alt="' + esc(alt || '') + '" loading="lazy">' : ''; }
+  function firstShot(a) { var f = a && a.body.filter(function (b) { return b[0] === 'img'; })[0]; return f ? 'assets/guides/' + f[1] : null; }
+  function vThumb(v) { var s = firstShot(A(v.article)); if (s) return s; var p = P(v.p); return p ? p.shot : null; }
   function artRow(a, showPortal) {
     return '<a class="arow" href="article.html?a=' + a.id + '">' + ic('file-text', 'arow-i') + '<span><b>' + esc(a.title) + '</b><span>' + (showPortal ? esc(P(a.p).name) + ' · ' : '') + esc(a.sum) + '</span></span>' + ic('chevron-right', 'arow-c') + '</a>';
   }
   function vidCard(v) {
-    var pn = v.p === 'all' ? 'All portals' : P(v.p).name;
-    return '<button type="button" class="vcard" data-video="' + v.id + '"><span class="vthumb">' + img(v.photo, 800, '', '') + '<span class="vplay">' + ic('play') + '</span>' + (v.yt ? '' : '<span class="vsoon">Guide available</span>') + '</span><span class="tg">' + esc(pn) + '</span><b>' + esc(v.title) + '</b></button>';
+    var pn = v.p === 'all' ? 'All portals' : P(v.p).name, t = vThumb(v);
+    var inner = '<span class="vthumb">' + (t ? shot(t) : '<span class="vblank">' + ic(v.p === 'all' ? 'layers' : P(v.p).icon) + '</span>') + '<span class="vplay">' + ic(v.yt ? 'play' : 'file-text') + '</span>' + (v.yt ? '' : '<span class="vsoon">Written guide for now</span>') + '</span><span class="tg">' + esc(pn) + '</span><b>' + esc(v.title) + '</b>';
+    /* no recording yet: it is a link to the guide, so it is an <a>, not a button */
+    return v.yt ? '<button type="button" class="vcard" data-video="' + v.id + '">' + inner + '</button>' : '<a class="vcard" href="article.html?a=' + v.article + '">' + inner + '</a>';
   }
   function wireVideos() {
     [].forEach.call(document.querySelectorAll('[data-video]'), function (b) {
@@ -143,16 +180,16 @@
     });
   }
   function openVideo(v) {
-    var a = A(v.article), dlg = document.createElement('div');
+    var a = A(v.article);
+    /* no recording yet: go straight to the written guide instead of a "coming soon" box */
+    if (!v.yt) { location.href = a ? 'article.html?a=' + a.id : 'videos.html'; return; }
+    var dlg = document.createElement('div');
     dlg.className = 'modal'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-label', v.title);
-    var body = v.yt
-      ? '<div class="m-vid"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(v.yt) + '?autoplay=1&rel=0" title="' + esc(v.title) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>'
-      : '<div class="m-soon">' + img(v.photo, 1200, '', '') + '<div class="m-soon-t"><span class="eyebrow">Video in production</span><h3>' + esc(v.title) + '</h3><p>We’re recording this demo now. The step-by-step guide covers the same ground today.</p><div class="cta-row">' + (a ? '<a class="btn" href="article.html?a=' + a.id + '">Read the guide ' + arrow() + '</a>' : '') + '<a class="link" href="' + H.support.demo + '" target="_blank" rel="noopener">Book a live demo</a></div></div></div>';
-    dlg.innerHTML = '<div class="m-back" data-close></div><div class="m-box"><button type="button" class="m-x" data-close aria-label="Close">' + ic('x') + '</button>' + body + '</div>';
+    dlg.innerHTML = '<div class="m-back" data-close></div><div class="m-box"><button type="button" class="m-x" data-close aria-label="Close">' + ic('x') + '</button><div class="m-vid"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(v.yt) + '?autoplay=1&rel=0" title="' + esc(v.title) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div></div>';
     document.body.appendChild(dlg); document.body.style.overflow = 'hidden'; icons();
     var last = document.activeElement; dlg.querySelector('.m-x').focus();
     function close() { dlg.remove(); document.body.style.overflow = ''; if (last) last.focus(); document.removeEventListener('keydown', key); }
-    function key(e) { if (e.key === 'Escape') close(); }
+    function key(e) { if (e.key === 'Escape') close(); if (e.key === 'Tab') { var f = [].slice.call(dlg.querySelectorAll('button, iframe')); var i = f.indexOf(document.activeElement); e.preventDefault(); (f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]).focus(); } }
     document.addEventListener('keydown', key);
     [].forEach.call(dlg.querySelectorAll('[data-close]'), function (x) { x.addEventListener('click', close); });
   }
@@ -168,52 +205,48 @@
 
   R.home = function () {
     title(''); var u = user();
-    var chips = [['Sign up', 'sign-up'], ['Forgot password', 'reset-password'], ['3D roof model', 'request-model'], ['Inverter support', 'scada-inverters'], ['Offline sync', 'go-offline'], ['Mobile apps', 'apps-download']];
-    var roles = [['studio', 'An EPC or sales team', 'Designs, BOQs and proposals.'], ['go', 'An installer or supervisor', 'Tasks, photos and offline sync.'], ['connect', 'A homeowner or business', 'Roof check, quotes and tracking.'], ['scada', 'An O&M team or plant owner', 'Live alerts and work orders.']];
-    var feat = H.videos[0];
+    var chips = [['Register a new lead', 'studio-add-lead'], ['Verify an installer account', 'go-verify-account'], ['Draw your roof boundary', 'connect-measure-roof'], ['Assign an installer', 'studio-assign-installer'], ['Reset a password', 'reset-password']];
+    var roles = [['studio', 'I run an EPC or sales team', 'Leads, bids, roof design, BOQ and proposals'], ['go', 'I install on site', 'Bids, the site checklist and handover'], ['connect', 'I’m going solar at home or work', 'Your roof, the estimate, agreement and payment'], ['scada', 'I look after a running plant', 'Alerts and work orders'], ['artha', 'I want to invest', 'How Artha works, and its risks']];
+    var lead = A('studio-roof-analysis'), side = [A('go-site-updates'), A('connect-install-path')];
+    function feat(a, big) {
+      var p = P(a.p);
+      return '<a class="feat' + (big ? ' big' : '') + '" href="article.html?a=' + a.id + '"><span class="feat-img">' + shot(firstShot(a), '', '') + '</span><span class="feat-t"><span class="tg">' + esc(p.name) + '</span><b>' + esc(a.title) + '</b><span>' + esc(a.sum) + '</span></span></a>';
+    }
     set(
-      '<section class="page-hero help-hero"><div class="wrap">'
-      + '<span class="eyebrow"><span class="dot"></span>pvNXT Help · all portals</span>'
-      + '<h1>How can we help?</h1><p class="lead">Guides, answers and demo videos for Atlas, Studio, Go, Connect, SCADA and Artha. One search covers every portal.</p>'
-      + searchBox({ big: true, select: true })
-      + '<div class="chips"><span class="chips-l">Popular:</span>' + chips.map(function (c) { return '<a class="chip" href="article.html?a=' + c[1] + '">' + c[0] + '</a>'; }).join('') + '</div>'
+      '<section class="page-hero home-hero"><div class="wrap home-in">'
+      + '<div class="hh-l"><span class="eyebrow"><span class="dot"></span>pvNXT Help</span>'
+      + '<h1>Find the step you’re on.</h1><p class="lead">Step-by-step guides for Studio, Go and Connect, with screenshots from the live portals.</p>'
+      + searchBox({ big: true, ph: 'Try “keepout zone”', rotate: 'keepout zone|Self Mode|Cost per Wp|register a new lead|draw roof boundary|assign an installer|reset password' })
+      + '<div class="chips"><span class="chips-l">Start with</span>' + chips.map(function (c) { return '<a class="chip" href="article.html?a=' + c[1] + '">' + c[0] + '</a>'; }).join('') + '</div></div>'
+      + '<nav class="picker" aria-label="Guides by role"><span class="picker-h">Which one are you?</span>'
+      + roles.map(function (r) { var p = P(r[0]); return '<a href="portal.html?p=' + p.id + '"><span class="pk-i">' + ic(p.icon) + '</span><span class="pk-t"><b>' + esc(r[1]) + '</b><span>' + esc(r[2]) + '</span></span><span class="pk-p">' + esc(p.name) + ic('arrow-right') + '</span></a>'; }).join('')
+      + '<span class="pk-foot">' + (u ? '<a href="my.html">Open my help</a>: your requests, saved guides and progress.' : '<a href="signin.html?next=my.html">Sign in</a> to track your requests and save guides. Every guide stays open without signing in.') + '</span></nav>'
       + '</div></section>'
 
-      + '<section class="sec" id="portals"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Browse by portal</span><h2>Choose your portal</h2></div><p class="muted">Not sure which one is yours? <a href="article.html?a=which-portal">Find out in one minute</a>.</p></div>'
-      + '<div class="pgrid">' + H.portals.map(portalTile).join('') + '</div></div></section>'
+      + '<section class="sec"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Start here</span><h2>The main job in each portal</h2></div><p class="muted">Each guide follows the portal screen by screen.</p></div>'
+      + '<div class="feats">' + feat(lead, true) + '<div class="feats-s">' + side.map(function (a) { return feat(a, false); }).join('') + '</div></div></div></section>'
 
-      + '<section class="sec tint"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Browse by role</span><h2>Guides for the work you do</h2></div></div><div class="rgrid">'
-      + roles.map(function (r) { var p = P(r[0]); return '<a class="rcard" href="portal.html?p=' + p.id + '"><span class="rimg">' + img(p.photo, 700, '', '') + '</span><span class="rbody"><span class="tg">I am…</span><b>' + esc(r[1]) + '</b><span>' + esc(r[2]) + '</span><span class="link">' + esc(p.name) + ' guides ' + arrow() + '</span></span></a>'; }).join('')
-      + '</div></div></section>'
-
-      + '<section class="sec"><div class="wrap two-col"><div><div class="stack-s mb"><span class="eyebrow">Start here</span><h2 class="h3x">Common questions</h2></div><div class="alist">' + H.popular.map(function (id) { return artRow(A(id), true); }).join('') + '</div></div>'
-      + '<div><div class="stack-s mb"><span class="eyebrow">Watch</span><h2 class="h3x">See it in action</h2></div>'
-      + '<button type="button" class="vfeat" data-video="' + feat.id + '">' + img(feat.photo, 1400, '', '') + '<span class="vfeat-sh"></span><span class="vplay big">' + ic('play') + '</span><span class="vfeat-t"><span class="tg">Overview · all portals</span><b>' + esc(feat.title) + '</b></span></button>'
-      + '<div class="vmini">' + H.videos.slice(2, 5).map(vidCard).join('') + '</div><a class="link mt" href="videos.html">All videos and demos ' + arrow() + '</a></div></div></section>'
-
-      + '<section class="sec tight"><div class="wrap"><div class="ws-teaser">' + img('team', 1200, 'ws-img', '') + '<div class="ws-t"><span class="eyebrow">' + (u ? 'Welcome back' : 'Signed-in help') + '</span><h2>' + (u ? 'Your help workspace is ready.' : 'Sign in for help that knows your portals.') + '</h2><p>Track your support requests, save guides, and pick up learning paths where you left off.</p><div class="cta-row">' + (u ? '<a class="btn" href="my.html">Open my help ' + arrow() + '</a>' : '<a class="btn" href="signin.html?next=my.html">Sign in ' + arrow() + '</a><span class="muted-d">Guides stay open to everyone.</span>') + '</div></div></div></div></section>'
-
-      + '<section class="sec tight"><div class="wrap"><div class="cgrid">'
-      + '<a class="ccard" href="mailto:' + H.support.email + '">' + ic('mail') + '<b>Email</b><span>' + H.support.email + '</span></a>'
-      + '<a class="ccard" href="' + H.support.whatsapp + '" target="_blank" rel="noopener">' + ic('message-circle') + '<b>WhatsApp</b><span>' + esc(H.support.hours) + '</span></a>'
-      + '<a class="ccard" href="contact.html">' + ic('inbox') + '<b>Raise a request</b><span>' + esc(H.support.reply) + '</span></a>'
-      + '<a class="ccard" href="' + H.support.demo + '" target="_blank" rel="noopener">' + ic('calendar') + '<b>Book a live demo</b><span>A walkthrough for your team</span></a>'
-      + '</div></div></section>'
+      + '<section class="sec tint" id="portals"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Guides by portal</span><h2>All portals share one project record</h2></div><p class="muted">A design from Studio becomes the task list in Go and the proposal in Connect, so the guides link across portals.</p></div>'
+      + '<div class="prows">' + H.portals.map(function (p) { var n = inPortal(p.id).length; return '<a class="prow" href="portal.html?p=' + p.id + '"><span class="prow-n">' + ic(p.icon) + '<b>' + esc(p.name) + '</b></span><span class="prow-l">' + esc(p.line) + '</span><span class="prow-h">' + (p.host || esc(p.tag)) + '</span><span class="prow-c">' + n + ' guide' + (n === 1 ? '' : 's') + ic('arrow-right') + '</span></a>'; }).join('') + '</div></div></section>'
+      + helpBand()
     );
-    wireSuggest(); wireVideos();
+    wireSuggest();
   };
 
   R.portal = function () {
     var p = P(qs('p')); if (!p) return R['404']();
     title(p.name + ' help');
-    var arts = inPortal(p.id), vids = H.videos.filter(function (v) { return v.p === p.id; });
+    var arts = inPortal(p.id), vids = H.videos.filter(function (v) { return v.p === p.id && v.yt; });
     var others = H.portals.filter(function (x) { return x.id !== p.id; });
+    var right = p.shot
+      ? '<figure class="phero-img"><button type="button" class="zoom" data-zoom="' + p.shot + '" data-cap="' + esc(p.name) + ' as it looks today" aria-label="Enlarge ' + esc(p.name) + ' screenshot">' + shot(p.shot, '', p.name + ' screenshot') + '<span class="zoom-i">' + ic('maximize-2') + '</span></button><figcaption>' + esc(p.name) + ' as it looks today.</figcaption></figure>'
+      : '<dl class="pfacts"><div><dt>For</dt><dd>' + esc(p.who) + '</dd></div>' + (p.host ? '<div><dt>Address</dt><dd>' + p.host + '</dd></div>' : '') + '<div><dt>Status</dt><dd>' + esc(p.tag) + '</dd></div><div><dt>Guides</dt><dd>' + arts.length + '</dd></div></dl>';
     set(
       '<section class="page-hero phero"><div class="wrap phero-in"><div class="stack">' + crumbs([[p.name + ' help']])
       + '<span class="eyebrow"><span class="dot"></span>' + esc(p.tag) + (p.host ? ' · ' + p.host : '') + '</span><h1>' + esc(p.name) + ' help</h1><p class="lead">' + esc(p.line) + ' For ' + esc(p.who.charAt(0).toLowerCase() + p.who.slice(1)) + '.</p>'
       + searchBox({ p: p.id, ph: 'Search ' + p.name + ' guides' })
-      + '<div class="cta-row">' + (p.url ? '<a class="btn ghost" href="' + p.url + '" target="_blank" rel="noopener">Open ' + esc(p.name) + ' ' + ic('external-link') + '</a>' : '') + (vids.length ? '<button type="button" class="link" data-video="' + vids[0].id + '">' + ic('circle-play') + 'Watch the demo</button>' : '') + '</div></div>'
-      + '<figure class="phero-img">' + img(p.photo, 1200, '', '') + '<figcaption>' + credit(p.photo) + '</figcaption></figure></div></section>'
+      + (p.url ? '<div class="cta-row"><a class="btn ghost" href="' + p.url + '" target="_blank" rel="noopener">Open ' + esc(p.name) + ' ' + ic('external-link') + '</a></div>' : '') + '</div>'
+      + right + '</div></section>'
 
       + '<section class="sec"><div class="wrap topics">' + p.topics.map(function (t) {
         var list = arts.filter(function (a) { return a.t === t.id; });
@@ -225,9 +258,22 @@
       + '<section class="sec tight"><div class="wrap"><div class="sec-row"><h2 class="h3x">Other portals</h2></div><div class="olist">' + others.map(function (o) { return '<a class="ochip" href="portal.html?p=' + o.id + '">' + ic(o.icon) + esc(o.name) + '</a>'; }).join('') + '</div></div></section>'
       + helpBand()
     );
-    wireSuggest(); wireVideos();
+    wireSuggest(); wireVideos(); wireZoom();
   };
 
+  function wireZoom() {
+    [].forEach.call(main.querySelectorAll('[data-zoom]'), function (z) {
+      z.addEventListener('click', function () {
+        var dlg = document.createElement('div'); dlg.className = 'modal'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-label', z.dataset.cap || 'Screenshot');
+        dlg.innerHTML = '<div class="m-back" data-close></div><div class="m-box m-shot"><button type="button" class="m-x" data-close aria-label="Close">' + ic('x') + '</button><img src="' + z.dataset.zoom + '" alt="' + esc(z.dataset.cap) + '">' + (z.dataset.cap ? '<p class="m-cap">' + esc(z.dataset.cap) + '</p>' : '') + '</div>';
+        document.body.appendChild(dlg); document.body.style.overflow = 'hidden'; icons(); dlg.querySelector('.m-x').focus();
+        function close() { dlg.remove(); document.body.style.overflow = ''; z.focus(); document.removeEventListener('keydown', key); }
+        function key(e) { if (e.key === 'Escape') close(); if (e.key === 'Tab') { e.preventDefault(); dlg.querySelector('.m-x').focus(); } }
+        document.addEventListener('keydown', key);
+        [].forEach.call(dlg.querySelectorAll('[data-close]'), function (x) { x.addEventListener('click', close); });
+      });
+    });
+  }
   function slug(s) { return 's-' + strip(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
   function block(b) {
     switch (b[0]) {
@@ -259,9 +305,9 @@
       + '</aside>'
       + '<article class="art">' + crumbs([[p.name, 'portal.html?p=' + p.id], [topic ? topic.name : '', 'portal.html?p=' + p.id], [a.title]])
       + '<h1>' + esc(a.title) + '</h1><p class="lead">' + esc(a.sum) + '</p>'
-      + '<div class="art-meta">' + pill(p.name) + (p.id !== 'artha' && p.id !== 'account' ? '<span>' + ic('monitor-smartphone') + 'Web and app</span>' : '') + '<button type="button" class="art-act" data-save aria-pressed="' + isSaved + '">' + ic(isSaved ? 'bookmark-check' : 'bookmark') + '<span>' + (isSaved ? 'Saved' : 'Save') + '</span></button><button type="button" class="art-act" data-copy>' + ic('link') + '<span>Copy link</span></button></div>'
+      + '<div class="art-meta">' + pill(p.name) + (p.id !== 'artha' && p.id !== 'account' ? '<span>' + ic('monitor-smartphone') + 'Web and app</span>' : '') + '<button type="button" class="art-act" data-save aria-pressed="' + isSaved + '">' + ic(isSaved ? 'bookmark-check' : 'bookmark') + '<span>' + (isSaved ? 'Saved' : u ? 'Save' : 'Sign in to save') + '</span></button><button type="button" class="art-act" data-copy>' + ic('link') + '<span>Copy link</span></button></div>'
       + '<div class="art-body">' + a.body.map(block).join('') + '</div>'
-      + (vid ? '<button type="button" class="art-vid" data-video="' + vid.id + '">' + img(vid.photo, 900, '', '') + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video</span><b>' + esc(vid.title) + '</b></span></button>' : '')
+      + (vid && vid.yt ? '<button type="button" class="art-vid" data-video="' + vid.id + '">' + shot(vThumb(vid)) + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video</span><b>' + esc(vid.title) + '</b></span></button>' : '')
       + '<div class="fb" data-fb><b>Was this helpful?</b><div class="fb-b"><button type="button" class="btn sm ghost" data-v="yes">' + ic('thumbs-up') + 'Yes</button><button type="button" class="btn sm ghost" data-v="no">' + ic('thumbs-down') + 'No</button></div><p class="fb-ok" hidden></p></div>'
       + '<nav class="pn" aria-label="Previous and next guide">' + (prev ? '<a class="pn-p" href="article.html?a=' + prev.id + '"><span class="pn-l">' + ic('chevron-left') + 'Previous</span><b>' + esc(prev.title) + '</b></a>' : '<span></span>') + (next ? '<a class="pn-n" href="article.html?a=' + next.id + '"><span class="pn-l">Next' + ic('chevron-right') + '</span><b>' + esc(next.title) + '</b></a>' : '') + '</nav>'
       + '</article>'
@@ -280,17 +326,15 @@
       function done() { t.textContent = 'Copied'; setTimeout(function () { t.textContent = 'Copy link'; }, 1600); }
       if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, done); else done();
     });
-    [].forEach.call(main.querySelectorAll('[data-zoom]'), function (z) {
-      z.addEventListener('click', function () {
-        var dlg = document.createElement('div'); dlg.className = 'modal'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-label', z.dataset.cap || 'Screenshot');
-        dlg.innerHTML = '<div class="m-back" data-close></div><div class="m-box m-shot"><button type="button" class="m-x" data-close aria-label="Close">' + ic('x') + '</button><img src="' + z.dataset.zoom + '" alt="' + esc(z.dataset.cap) + '">' + (z.dataset.cap ? '<p class="m-cap">' + esc(z.dataset.cap) + '</p>' : '') + '</div>';
-        document.body.appendChild(dlg); document.body.style.overflow = 'hidden'; icons(); dlg.querySelector('.m-x').focus();
-        function close() { dlg.remove(); document.body.style.overflow = ''; z.focus(); document.removeEventListener('keydown', key); }
-        function key(e) { if (e.key === 'Escape') close(); }
-        document.addEventListener('keydown', key);
-        [].forEach.call(dlg.querySelectorAll('[data-close]'), function (x) { x.addEventListener('click', close); });
-      });
-    });
+    wireZoom();
+    /* highlight the section being read in "On this page" */
+    var toc = main.querySelectorAll('.toc a');
+    if (toc.length && 'IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (en) { if (en.isIntersecting) [].forEach.call(toc, function (l) { if (l.getAttribute('href') === '#' + en.target.id) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current'); }); });
+      }, { rootMargin: '-90px 0px -65% 0px' });
+      [].forEach.call(main.querySelectorAll('.art-body h2[id]'), function (h) { io.observe(h); });
+    }
     [].forEach.call(main.querySelectorAll('[data-fb] [data-v]'), function (b) {
       b.addEventListener('click', function () {
         var fb = store.get('pvh_feedback', {}); fb[a.id] = b.dataset.v; store.set('pvh_feedback', fb);
@@ -306,20 +350,19 @@
     var tabs = [{ id: 'all', name: 'All' }].concat(H.portals.filter(function (p) { return H.videos.some(function (v) { return v.p === p.id; }); }));
     var start = (location.hash || '').slice(1); if (!tabs.some(function (t) { return t.id === start; })) start = 'all';
     set(
-      '<section class="page-hero"><div class="wrap">' + crumbs([['Videos']]) + '<span class="eyebrow"><span class="dot"></span>Open to everyone</span><h1>Learn pvNXT by watching it work.</h1><p class="lead">Short demos for every portal, and learning paths for each role. Prefer a person? Book a live walkthrough.</p><div class="cta-row"><button type="button" class="btn" data-video="v-overview">' + ic('play') + 'Watch the overview</button><a class="link" href="' + H.support.demo + '" target="_blank" rel="noopener">Book a live demo ' + arrow() + '</a></div></div></section>'
-      + '<section class="sec"><div class="wrap"><div class="tabs-r" role="tablist" aria-label="Filter videos by portal">' + tabs.map(function (t) { return '<button type="button" role="tab" data-tab="' + t.id + '" aria-selected="' + (t.id === start) + '">' + esc(t.name) + '</button>'; }).join('') + '</div><div class="vgrid" id="vg"></div></div></section>'
-      + '<section class="sec tint"><div class="wrap"><div class="stack-s mb"><span class="eyebrow">Learning paths</span><h2>A short course for each role</h2></div><div class="pathgrid">'
+      '<section class="page-hero"><div class="wrap">' + crumbs([['Videos']]) + '<span class="eyebrow"><span class="dot"></span>' + (H.videos.some(function (v) { return v.yt; }) ? 'Demos' : 'Recordings in progress') + '</span><h1>Demo videos</h1><p class="lead">We’re recording a short demo for each task below. Until a video is up, its card opens the written guide, which has the same steps with screenshots.</p><div class="cta-row"><a class="btn" href="' + H.support.demo + '" target="_blank" rel="noopener">Book a live walkthrough instead ' + arrow() + '</a></div></div></section>'
+      + '<section class="sec"><div class="wrap"><div class="tabs-r" role="group" aria-label="Filter videos by portal">' + tabs.map(function (t) { return '<button type="button" data-tab="' + t.id + '" aria-pressed="' + (t.id === start) + '">' + esc(t.name) + '</button>'; }).join('') + '</div><div class="vgrid" id="vg"></div></div></section>'
+      + '<section class="sec tint"><div class="wrap"><div class="stack-s mb"><span class="eyebrow">Learning paths</span><h2>Each portal, in the order you’ll use it</h2></div><div class="pathgrid">'
       + H.paths.map(function (pa) { var p = P(pa.p); return '<div class="path"><span class="tg">' + esc(p.name) + '</span><b>' + esc(pa.title) + '</b><ol>' + pa.steps.map(function (s, i) { var x = A(s); return '<li><a href="article.html?a=' + x.id + '"><i>' + String(i + 1).padStart(2, '0') + '</i>' + esc(x.title) + '</a></li>'; }).join('') + '</ol><a class="link" href="article.html?a=' + pa.steps[0] + '">Start path ' + arrow() + '</a></div>'; }).join('')
       + '</div></div></section>' + helpBand()
     );
     function draw(id) {
       document.getElementById('vg').innerHTML = H.videos.filter(function (v) { return id === 'all' || v.p === id; }).map(vidCard).join('');
-      [].forEach.call(main.querySelectorAll('[data-tab]'), function (b) { b.setAttribute('aria-selected', b.dataset.tab === id); });
+      [].forEach.call(main.querySelectorAll('[data-tab]'), function (b) { b.setAttribute('aria-pressed', b.dataset.tab === id); });
       icons(); wireVideos();
     }
     [].forEach.call(main.querySelectorAll('[data-tab]'), function (b) { b.addEventListener('click', function () { history.replaceState(null, '', b.dataset.tab === 'all' ? 'videos.html' : '#' + b.dataset.tab); draw(b.dataset.tab); }); });
     draw(start);
-    main.querySelector('.page-hero [data-video]').addEventListener('click', function () { openVideo(V('v-overview')); });
   };
 
   R.search = function () {
@@ -333,7 +376,7 @@
       + (r.a.length ? '<h2 class="h3x mb">Guides</h2><div class="alist">' + r.a.map(function (a) { return artRow(a, true); }).join('') + '</div>' : '')
       + (r.v.length ? '<h2 class="h3x mb mt2">Videos</h2><div class="vgrid">' + r.v.map(vidCard).join('') + '</div>' : '')
       + (q && !n ? '<div class="empty">' + ic('search-x') + '<h2>No guides match that yet.</h2><p>Try fewer words, or one of these. You can also ask us directly.</p><div class="chips">' + H.popular.slice(0, 4).map(function (id) { var x = A(id); return '<a class="chip" href="article.html?a=' + id + '">' + esc(x.title) + '</a>'; }).join('') + '</div><a class="btn" href="contact.html?topic=' + encodeURIComponent(q) + '">Ask support</a></div>' : '')
-      + (!q ? '<h2 class="h3x mb">Popular guides</h2><div class="alist">' + H.popular.map(function (id) { return artRow(A(id), true); }).join('') + '</div>' : '')
+      + (!q ? '<h2 class="h3x mb">Start with these</h2><div class="alist">' + H.popular.map(function (id) { return artRow(A(id), true); }).join('') + '</div>' : '')
       + '</div></section>' + helpBand()
     );
     wireSuggest(); wireVideos();
@@ -404,7 +447,7 @@
       + '<fieldset class="pchk"><legend>Which portals do you use?</legend>' + choose.map(function (id) { var p = P(id); return '<label class="chk"><input type="checkbox" name="pt" value="' + id + '"><span>' + ic(p.icon) + esc(p.name) + '</span></label>'; }).join('') + '</fieldset>'
       + '<p class="ferr" id="serr" role="alert" hidden></p><button class="btn wide" type="submit">Continue ' + arrow() + '</button></form>'
       + '<div class="demo-note">' + ic('info') + '<span><b>Demo sign-in.</b> No password is checked yet. Single sign-on with your pvNXT account is coming next.</span></div></div>'
-      + '<div class="signin-side">' + img('install', 1000, '', '') + '<div class="signin-q"><b>Signed in, you get:</b><ul><li>' + ic('inbox') + 'Your support requests in one place</li><li>' + ic('bookmark') + 'Saved guides</li><li>' + ic('graduation-cap') + 'Learning paths with progress</li><li>' + ic('layout-dashboard') + 'Help for the portals you use</li></ul><a class="link" href="index.html">Or keep browsing as a guest ' + arrow() + '</a></div></div></div></section>'
+      + '<div class="signin-side"><div class="signin-q"><b>Signed in, you get:</b><ul><li>' + ic('inbox') + 'Your support requests in one place</li><li>' + ic('bookmark') + 'Saved guides</li><li>' + ic('graduation-cap') + 'Learning paths with progress</li><li>' + ic('layout-dashboard') + 'Help for the portals you use</li></ul><a class="link" href="index.html">Or keep browsing as a guest ' + arrow() + '</a></div></div></div></section>'
     );
     document.getElementById('si').addEventListener('submit', function (e) {
       e.preventDefault(); var f = e.target, em = f.email.value.trim(), err = document.getElementById('serr');
@@ -441,7 +484,7 @@
     function progress(pa) { var read = store.get('pvh_read', []); var d = pa.steps.filter(function (s) { return read.indexOf(s) > -1; }).length; return { d: d, n: pa.steps.length, next: pa.steps.filter(function (s) { return read.indexOf(s) < 0; })[0] }; }
     function pathCard(pa, compact) {
       var g = progress(pa), pc = Math.round(g.d / g.n * 100), p = P(pa.p);
-      return '<div class="pcard"><div class="pcard-h">' + img(p.photo, 300, 'pthumb', '') + '<div class="grow"><b>' + esc(pa.title) + '</b><span class="bar" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + esc(pa.title) + ' progress"><span style="width:' + pc + '%"></span></span><span class="mono">' + g.d + ' of ' + g.n + ' guides read</span></div></div>'
+      return '<div class="pcard"><div class="pcard-h">' + (p.shot ? shot(p.shot, 'pthumb', '') : '<span class="pthumb picon">' + ic(p.icon) + '</span>') + '<div class="grow"><b>' + esc(pa.title) + '</b><span class="bar" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + esc(pa.title) + ' progress"><span style="width:' + pc + '%"></span></span><span class="mono">' + g.d + ' of ' + g.n + ' guides read</span></div></div>'
         + (compact ? '' : '<ol class="psteps">' + pa.steps.map(function (s) { var x = A(s), done = store.get('pvh_read', []).indexOf(s) > -1; return '<li class="' + (done ? 'done' : '') + '"><a href="article.html?a=' + s + '">' + ic(done ? 'circle-check' : 'circle') + esc(x.title) + '</a></li>'; }).join('') + '</ol>')
         + (g.next ? '<a class="link sm" href="article.html?a=' + g.next + '">' + (g.d ? 'Continue' : 'Start') + ' ' + arrow() + '</a>' : '<span class="mono ok-t">' + ic('circle-check') + 'Complete</span>') + '</div>';
     }
@@ -450,7 +493,7 @@
         var first = mine[0], rs = reqs(), rec = store.get('pvh_recent', []).map(A).filter(Boolean).slice(0, 4);
         var myPaths = H.paths.filter(function (pa) { return u.portals.indexOf(pa.p) > -1; });
         var faqs = H.articles.filter(function (a) { return u.portals.indexOf(a.p) > -1; }).slice(0, 5);
-        return '<div class="ws-hero"><h1>Get the help you need</h1><p>Answers for the portals you use, and the status of your requests.</p>' + searchBox({ ph: 'Ask a question about ' + mine.map(function (p) { return p.name; }).join(', '), p: mine.length === 1 ? first.id : '' }) + '</div>'
+        return '<div class="ws-hero"><h1>Help for ' + esc(names(mine)) + '</h1><p>Guides for the portals you use, and where your support requests stand.</p>' + searchBox({ ph: 'Ask a question about ' + mine.map(function (p) { return p.name; }).join(', '), p: mine.length === 1 ? first.id : '' }) + '</div>'
           + '<div class="cards3"><a class="wcard" href="portal.html?p=' + first.id + '"><span class="wic">' + ic('graduation-cap') + '</span><b>Getting started in ' + esc(first.name) + '</b><span>' + esc(inPortal(first.id)[0].sum) + '</span><span class="link sm">See guides ' + arrow() + '</span></a>'
           + '<a class="wcard" href="contact.html"><span class="wic amber">' + ic('inbox') + '</span><b>Raise a request</b><span>' + esc(H.support.reply) + ' Track it here.</span><span class="link sm">New request ' + arrow() + '</span></a>'
           + '<a class="wcard" href="portal.html?p=account"><span class="wic">' + ic('shield-check') + '</span><b>Account &amp; security</b><span>Sign-up, passwords, access and data safety.</span><span class="link sm">See guides ' + arrow() + '</span></a></div>'
@@ -489,6 +532,7 @@
 
   layout();
   (R[page] || R['404'])();
+  wireSuggest();
   icons(); window.addEventListener('load', icons);
   /* flashlight on page heroes, same as terranxt.com */
   [].forEach.call(document.querySelectorAll('.page-hero'), function (s) {

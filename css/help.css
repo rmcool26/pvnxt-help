@@ -71,13 +71,70 @@ button.link{background:none;border:0;padding:0;cursor:pointer}
 .chip{font:500 14px var(--f-body);padding:8px 14px;border-radius:99px;background:#fff;border:1px solid var(--line-2);color:var(--ink)}
 .chip:hover{border-color:var(--teal);color:var(--ink);background:var(--tint)}
 
-/* hero */
-.help-hero{padding:88px 0 72px;background:var(--paper)}
-.help-hero .wrap{align-items:center;text-align:center}
-.help-hero h1{font-size:clamp(42px,6vw,68px)}
-.help-hero .lead{margin:0 auto}
-.help-hero .sbox{margin-top:8px}
-.help-hero .chips{justify-content:center}
+/* home hero: left-aligned search, role picker on the right (no centered template) */
+.home-hero{padding:72px 0 64px;background:var(--paper)}
+.page-hero .home-in{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:start}
+.hh-l{display:flex;flex-direction:column;gap:20px;padding-top:12px}
+.hh-l{min-width:0}
+.home-hero h1{font-size:clamp(42px,6.2vw,76px);line-height:1;letter-spacing:-.04em;max-width:9.5em}
+.home-hero .sbox{max-width:none}
+.home-hero .chips-l::after{content:':'}
+.picker{display:flex;flex-direction:column;background:#fff;border:1.5px solid var(--ink);border-radius:16px;overflow:hidden;box-shadow:10px 10px 0 var(--tint)}
+.picker-h{font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--teal-dd);padding:16px 20px 10px}
+.picker>a{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 20px;border-top:1px solid var(--line);color:var(--ink)}
+.picker>a:hover{background:var(--tint);color:var(--ink)}
+.pk-i{width:40px;height:40px;border-radius:10px;background:var(--tint);color:var(--teal-d);display:grid;place-items:center}
+.pk-i svg{width:20px;height:20px}
+.pk-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pk-t b{font:700 16px/1.25 var(--f-head)}
+.pk-t span{font-size:13.5px;color:var(--ink-2);line-height:1.4}
+.pk-p{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--f-mono);text-transform:uppercase;color:var(--teal-dd);white-space:nowrap}
+.pk-p svg{width:15px;height:15px}
+.pk-foot a{font-weight:700}
+.pk-foot{display:block;padding:14px 20px;border-top:1px solid var(--line);background:var(--paper);font-size:13.5px;color:var(--ink-2)}
+@media(max-width:960px){.page-hero .home-in{grid-template-columns:minmax(0,1fr);gap:36px}.picker{box-shadow:none}}
+@media(max-width:520px){.picker>a{grid-template-columns:36px minmax(0,1fr)}.pk-p{display:none}}
+
+/* start here: one large guide, two small */
+.feats{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px}
+.feats-s{display:grid;grid-template-rows:1fr 1fr;gap:20px}
+.feat{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff;color:var(--ink)}
+.feat:hover{border-color:var(--ink);color:var(--ink)}
+.feat-img{display:block;aspect-ratio:16/8;overflow:hidden;background:var(--paper);border-bottom:1px solid var(--line)}
+.feat.big .feat-img{aspect-ratio:16/9.5}
+.feat-img img{width:100%;height:100%;object-fit:cover;object-position:left top}
+.feat-t{display:flex;flex-direction:column;gap:6px;padding:18px 20px 20px}
+.feat-t b{font:800 19px/1.25 var(--f-head)}
+.feat.big .feat-t b{font-size:26px;letter-spacing:-.02em}
+.feat-t>span:last-child{font-size:14.5px;color:var(--ink-2)}
+.feats-s .feat{flex-direction:row}
+.feats-s .feat-img{flex:0 0 46%;aspect-ratio:auto;border-bottom:0;border-right:1px solid var(--line)}
+@media(max-width:900px){.feats{grid-template-columns:1fr}.feats-s{grid-template-rows:none}}
+@media(max-width:560px){.feats-s .feat{flex-direction:column}.feats-s .feat-img{aspect-ratio:16/8;border-right:0;border-bottom:1px solid var(--line)}}
+
+/* portals as a table, like terranxt.com's "Find your portal" rows */
+.prows{border-top:1.5px solid var(--ink)}
+.prow{display:grid;grid-template-columns:200px minmax(0,1fr) 190px 120px;gap:20px;align-items:center;padding:18px 4px;border-bottom:1px solid var(--line-2);color:var(--ink)}
+.prow:hover{background:#fff;color:var(--ink)}
+.prow-n{display:flex;align-items:center;gap:12px}
+.prow-n svg{width:22px;height:22px;color:var(--teal-d)}
+.prow-n b{font:800 20px var(--f-head)}
+.prow-l{color:var(--ink-2)}
+.prow-h{font:400 13px var(--f-mono);color:var(--ink-2)}
+.prow-c{display:inline-flex;justify-content:flex-end;align-items:center;gap:6px;font:500 12.5px var(--f-mono);color:var(--teal-dd);white-space:nowrap}
+.prow-c svg{width:15px;height:15px}
+@media(max-width:860px){.prow{grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}.prow-l,.prow-h{grid-column:1}.prow-c{grid-column:2;grid-row:1}}
+
+.pfacts{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;border:1.5px solid var(--ink);border-radius:16px;background:#fff;overflow:hidden}
+.pfacts div{padding:18px 20px;border-bottom:1px solid var(--line)}
+.pfacts div:nth-child(odd){border-right:1px solid var(--line)}
+.pfacts dt{font:500 11.5px var(--f-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--teal-dd);margin-bottom:6px}
+.pfacts dd{margin:0;font:700 16px/1.35 var(--f-head)}
+.phero-img .zoom img{aspect-ratio:16/10;object-fit:cover;object-position:left top;border:0;border-radius:0}
+.vblank{display:grid;place-items:center;width:100%;height:100%;background:var(--ink);color:#7fd8e4}
+.vblank svg{width:36px;height:36px}
+.picon{display:grid;place-items:center;color:var(--teal-d)}
+.picon svg{width:24px;height:24px}
 .tight-hero{padding:56px 0 40px}
 .tight-hero h1{font-size:clamp(30px,4vw,44px)}
 
@@ -151,7 +208,7 @@ button.link{background:none;border:0;padding:0;cursor:pointer}
 .tabs-r{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
 .tabs-r button{padding:10px 16px;border-radius:99px;border:1.5px solid var(--line-2);background:#fff;font:600 14px var(--f-head);cursor:pointer;color:var(--ink);min-height:42px}
 .tabs-r button:hover{border-color:var(--teal)}
-.tabs-r button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tabs-r button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
 
 /* modal */
 .modal{position:fixed;inset:0;z-index:300;display:grid;place-items:center;padding:20px}
@@ -343,7 +400,8 @@ figcaption a{color:var(--ink-2);text-decoration:underline}
 .demo-note svg{width:18px;height:18px;color:var(--teal-d);flex:none;margin-top:2px}
 .signin-side{position:relative;border-radius:16px;overflow:hidden;min-height:440px;background:var(--ink)}
 .signin-side img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
-.signin-q{position:absolute;left:24px;right:24px;bottom:24px;background:rgba(11,42,48,.9);color:#fff;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.signin-side{display:flex;align-items:flex-end;padding:24px}
+.signin-q{position:static;background:rgba(11,42,48,.9);color:#fff;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px}
 .signin-q b{font:800 18px var(--f-head)}
 .signin-q ul{display:flex;flex-direction:column;gap:8px}
 .signin-q li{display:flex;gap:10px;align-items:center;color:#d5e6e9;font-size:15px}
@@ -414,3 +472,43 @@ figcaption a{color:var(--ink-2);text-decoration:underline}
 .faq-c details p{padding-bottom:16px;font-size:15px}
 @media(max-width:800px){.faq-c{grid-template-columns:1fr}}
 .cards3{gap:16px}
+
+/* ---------- interactions ---------- */
+/* Hero hover: the terranxt.com logo-pattern flashlight is replaced by a quiet one.
+   The existing dot grid turns teal in a small circle under the cursor. No logo, no motion of its own. */
+.page-hero::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:none;background-image:radial-gradient(var(--teal) 1.3px,transparent 1.4px);background-size:24px 24px;opacity:0;transition:opacity .4s ease;
+  -webkit-mask-image:radial-gradient(circle 150px at var(--mx) var(--my),#000 0,transparent 100%);mask-image:radial-gradient(circle 150px at var(--mx) var(--my),#000 0,transparent 100%);
+  -webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-composite:source-over;mask-composite:add}
+@media(hover:hover){.page-hero:hover::after{opacity:.5}}
+/* while the visitor uses search, the effect steps back */
+.page-hero:focus-within::after{opacity:0!important}
+
+/* one hover language everywhere: lighter surface, darker border, arrow nudges toward the destination */
+.arow-c,.prow-c svg,.pk-p svg,.link svg,.sugg-all svg,.feat-t .tg{transition:transform .18s ease,color .18s ease}
+.arow:hover .arow-c,.prow:hover .prow-c svg,.picker>a:hover .pk-p svg,.link:hover svg,.sugg-all:hover svg,.sugg-all:focus svg{transform:translateX(3px)}
+.feat{transition:border-color .18s,box-shadow .18s}
+.feat:hover{box-shadow:0 10px 28px rgba(11,42,48,.08)}
+.feat:hover b{color:var(--teal-dd)}
+.prow,.arow,.picker>a,.chip,.ochip,.ccard,.wcard,.tabs-r button,.art-act,.sugg a{transition:background-color .15s,border-color .15s,color .15s}
+a.vcard{text-decoration:none}
+.vcard:focus-visible{outline:3px solid var(--teal);outline-offset:4px;border-radius:12px}
+.vcard:hover .vthumb{border-color:var(--ink)}
+
+/* search: live count, placeholder fade, "/" hint */
+.sugg-n{display:block;padding:8px 12px 6px;font:500 11.5px var(--f-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--teal-dd)}
+.sugg a:focus{outline:none;background:var(--tint)}
+.sbox input::placeholder{transition:opacity .2s ease}
+.sbox input.ph-out::placeholder{opacity:0}
+.hsearch{position:relative}
+.hsearch .sugg{left:auto;right:0;width:440px;max-width:calc(100vw - 32px)}
+.hsearch.m .sugg{position:static;width:auto;margin-top:8px;box-shadow:none}
+.kbd{font:500 12px var(--f-mono);color:var(--ink-2);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:0 6px;line-height:20px;flex:none}
+.hsearch:focus-within .kbd{display:none}
+@media(hover:none){.kbd{display:none}}
+
+/* "On this page": current section */
+.toc a[aria-current]{color:var(--teal-dd);font-weight:600;box-shadow:inset 2px 0 0 var(--teal);padding-left:10px}
+.toc a{transition:color .15s,padding .15s}
+/* let search suggestions drop below the hero instead of being clipped by it */
+.page-hero{overflow:visible}
+.page-hero .sugg{z-index:40}

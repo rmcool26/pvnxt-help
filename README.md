@@ -32,9 +32,9 @@ Everything is in `js/data.js`:
 
 Atlas, SCADA, Artha, Apps and Account guides were drafted from terranxt.com. **Have those portal owners check the steps against the live UI before launch.**
 
-## Photos
+## Images
 
-Photos come from Unsplash and are hotlinked, as Unsplash's guidelines ask. Credits are in the footer and under portal photos. If Unsplash can't load, each image falls back to the matching product image in `assets/images/`.
+The site uses only real screenshots from the portals (`assets/guides/`). There are no stock photos or AI images. A portal page shows its `shot` from `js/data.js`, and portals without one (SCADA, Artha, Apps, Account) show a facts panel instead. When you have real SCADA or Artha screenshots, add them under `assets/guides/` and set `shot`. Video cards use the first screenshot of their linked guide.
 
 ## Sign-in
 

@@ -1,4 +1,4 @@
-/* pvNXT Help content. Edit here: portals, articles, videos, FAQs, status, photos.
+/* pvNXT Help content. Edit here: portals, articles, videos, FAQs, status, screenshots.
    Article body blocks: ['p', text] ['h', heading] ['steps', [..]] ['list', [..]] ['tip', text] ['note', text] ['warn', text]
    Text may contain simple HTML (<b>, <a>). */
 window.HELP = {
@@ -11,34 +11,23 @@ window.HELP = {
     site: 'https://terranxt.com'
   },
 
-  /* Unsplash photos, hotlinked as Unsplash asks. `local` is the fallback if Unsplash can't load. */
-  photos: {
-    roof:    { id: 'photo-1658298775754-5839ffd434cc', by: 'Soren H',            user: 'hosoren',           alt: 'Solar panels on a pitched roof under a blue sky', local: 'hiw-design.jpg' },
-    install: { id: 'photo-1624397640148-949b1732bb0a', by: 'Bill Mead',          user: 'wmmead',            alt: 'A person installing a solar panel on a roof',     local: 'go.jpg' },
-    crew:    { id: 'photo-1660330589257-813305a4a383', by: 'Raze Solar',         user: 'razesolar',         alt: 'An installer working on a rooftop solar array',    local: 'field-app.jpg' },
-    farm:    { id: 'photo-1497435334941-8c899ee9e8e9', by: 'Andreas Gücklhorn',  user: 'draufsicht',        alt: 'Aerial view of a solar plant in a green field',   local: 'scada.jpg' },
-    house:   { id: 'photo-1655300256335-beef51a914fe', by: 'Watt A Lot',         user: 'wattalot',          alt: 'A house with solar panels on its roof',           local: 'connect.jpg' },
-    team:    { id: 'photo-1581091226033-d5c48150dbaa', by: 'ThisisEngineering',  user: 'thisisengineering', alt: 'Three engineers reviewing work on a laptop',      local: 'proposal.jpg' },
-    sunset:  { id: 'photo-1463173904305-ba479d2123b7', by: 'Karsten Würth',      user: 'karsten_wuerth',    alt: 'A solar panel under an evening sky',              local: 'hiw-deliver.jpg' },
-    hardhat: { id: 'photo-1648135327756-b606e2eb8caa', by: 'Evgeniy Alyoshin',   user: 'oqtave',            alt: 'A hard hat resting on solar panels',              local: 'hiw-scan.jpg' }
-  },
 
   portals: [
-    { id: 'atlas', name: 'Atlas', icon: 'satellite', tag: 'Inside Studio & Connect', line: '3D roof models from satellite imagery.', who: 'Anyone starting a solar project', host: null, url: null, photo: 'roof', shot: 'atlas-pipeline.jpg',
+    { id: 'atlas', name: 'Atlas', icon: 'satellite', tag: 'Inside Studio & Connect', line: '3D roof models from satellite imagery.', who: 'Anyone starting a solar project', host: null, url: null, shot: 'assets/guides/studio/atlas-3d.jpg',
       topics: [{ id: 'models', name: 'Roof models' }] },
-    { id: 'studio', name: 'Studio', icon: 'pencil-ruler', tag: 'Beta', line: 'Leads, roof design, BOQ, proposals and installer assignment.', who: 'Solar EPC companies, designers and sales teams', host: 'epc.pvnxt.com', url: 'https://epc.pvnxt.com', photo: 'team', shot: 'studio-3d.jpg',
+    { id: 'studio', name: 'Studio', icon: 'pencil-ruler', tag: 'Beta', line: 'Leads, roof design, BOQ, proposals and installer assignment.', who: 'Solar EPC companies, designers and sales teams', host: 'epc.pvnxt.com', url: 'https://epc.pvnxt.com', shot: 'assets/guides/studio/layout-generated.jpg',
       topics: [{ id: 'start', name: 'Getting started' }, { id: 'leads', name: 'Leads & bids' }, { id: 'design', name: 'Roof analysis & design' }, { id: 'sell', name: 'BOQ & proposals' }, { id: 'execute', name: 'Approval & installers' }] },
-    { id: 'go', name: 'Go', icon: 'hard-hat', tag: 'Beta', line: 'Bid on installation jobs, update site checklists, hand over.', who: 'Solar installers and ground teams, company or freelance', host: 'installer.pvnxt.com', url: 'https://installer.pvnxt.com', photo: 'install', shot: 'go.jpg',
+    { id: 'go', name: 'Go', icon: 'hard-hat', tag: 'Beta', line: 'Bid on installation jobs, update site checklists, hand over.', who: 'Solar installers and ground teams, company or freelance', host: 'installer.pvnxt.com', url: 'https://installer.pvnxt.com', shot: 'assets/guides/go/site-update.jpg',
       topics: [{ id: 'start', name: 'Getting started' }, { id: 'bids', name: 'Bids & projects' }, { id: 'site', name: 'On site' }, { id: 'close', name: 'Handover' }] },
-    { id: 'connect', name: 'Connect', icon: 'house', tag: 'Beta', line: 'Find your roof, get an estimate, approve, pay and track.', who: 'Homeowners and business owners going solar', host: 'consumer.pvnxt.com', url: 'https://consumer.pvnxt.com', photo: 'house', shot: 'connect.jpg',
+    { id: 'connect', name: 'Connect', icon: 'house', tag: 'Beta', line: 'Find your roof, get an estimate, approve, pay and track.', who: 'Homeowners and business owners going solar', host: 'consumer.pvnxt.com', url: 'https://consumer.pvnxt.com', shot: 'assets/guides/connect/proposal-ready.jpg',
       topics: [{ id: 'roof', name: 'Your roof details' }, { id: 'estimate', name: 'Estimate & options' }, { id: 'pay', name: 'Approval & payment' }, { id: 'track', name: 'Installation tracking' }] },
-    { id: 'scada', name: 'SCADA', icon: 'activity', tag: 'Beta', line: 'Plant monitoring. Every alert has an owner.', who: 'O&M teams, plant owners, EPC managers, technicians', host: 'scada.pvnxt.com', url: 'https://scada.pvnxt.com', photo: 'farm', shot: 'scada.jpg',
+    { id: 'scada', name: 'SCADA', icon: 'activity', tag: 'Beta', line: 'Plant monitoring. Every alert has an owner.', who: 'O&M teams, plant owners, EPC managers, technicians', host: 'scada.pvnxt.com', url: 'https://scada.pvnxt.com', shot: null,
       topics: [{ id: 'setup', name: 'Set up' }, { id: 'alerts', name: 'Alerts & work orders' }] },
-    { id: 'artha', name: 'Artha', icon: 'trending-up', tag: 'Early access', line: 'Back real solar projects. Read the risks first.', who: 'Investors', host: 'artha.pvnxt.com', url: 'https://artha.pvnxt.com', photo: 'sunset', shot: null,
+    { id: 'artha', name: 'Artha', icon: 'trending-up', tag: 'Early access', line: 'Back real solar projects. Read the risks first.', who: 'Investors', host: 'artha.pvnxt.com', url: 'https://artha.pvnxt.com', shot: null,
       topics: [{ id: 'basics', name: 'Basics' }] },
-    { id: 'apps', name: 'Mobile apps', icon: 'smartphone', tag: 'Android · iOS', line: 'One app for each portal. Free during beta.', who: 'Everyone on the move', host: null, url: null, photo: 'crew', shot: 'field-app.jpg',
+    { id: 'apps', name: 'Mobile apps', icon: 'smartphone', tag: 'Android · iOS', line: 'One app for each portal. Free during beta.', who: 'Everyone on the move', host: null, url: null, shot: null,
       topics: [{ id: 'apps', name: 'Apps' }] },
-    { id: 'account', name: 'Account & security', icon: 'shield-check', tag: 'All portals', line: 'Sign-up, passwords, access and data safety.', who: 'Everyone', host: null, url: null, photo: 'hardhat', shot: null,
+    { id: 'account', name: 'Account & security', icon: 'shield-check', tag: 'All portals', line: 'Sign-up, passwords, access and data safety.', who: 'Everyone', host: null, url: null, shot: null,
       topics: [{ id: 'account', name: 'Your account' }] }
   ],
 
@@ -370,16 +359,16 @@ window.HELP = {
 
   /* Videos. Paste a YouTube ID into `yt` when the recording is ready. */
   videos: [
-    { id: 'v-overview', p: 'all', title: 'pvNXT in 2 minutes: from roof scan to running plant', photo: 'roof', article: 'which-portal', yt: '' },
-    { id: 'v-atlas', p: 'atlas', title: 'Requesting a 3D roof model', photo: 'sunset', article: 'request-model', yt: '' },
-    { id: 'v-studio', p: 'studio', title: 'Studio: from roof analysis to proposal', photo: 'team', article: 'studio-roof-analysis', yt: '' },
-    { id: 'v-studio-leads', p: 'studio', title: 'Studio: three ways to start a project', photo: 'roof', article: 'studio-lead-ways', yt: '' },
-    { id: 'v-go', p: 'go', title: 'Go: recording site work in the checklist', photo: 'install', article: 'go-site-updates', yt: '' },
-    { id: 'v-go-bid', p: 'go', title: 'Go: finding and bidding on jobs', photo: 'crew', article: 'go-bid-board', yt: '' },
-    { id: 'v-connect', p: 'connect', title: 'Connect: find your roof and get an estimate', photo: 'house', article: 'connect-create-project', yt: '' },
-    { id: 'v-connect-pay', p: 'connect', title: 'Connect: approve, sign and pay', photo: 'sunset', article: 'connect-agreement', yt: '' },
-    { id: 'v-scada', p: 'scada', title: 'SCADA: from alert to fix', photo: 'farm', article: 'scada-work-orders', yt: '' },
-    { id: 'v-artha', p: 'artha', title: 'Artha: how it works and the risks', photo: 'hardhat', article: 'artha-what', yt: '' }
+    { id: 'v-overview', p: 'all', title: 'pvNXT in 2 minutes: from roof scan to running plant', article: 'which-portal', yt: '' },
+    { id: 'v-atlas', p: 'atlas', title: 'Requesting a 3D roof model', article: 'request-model', yt: '' },
+    { id: 'v-studio', p: 'studio', title: 'Studio: from roof analysis to proposal', article: 'studio-roof-analysis', yt: '' },
+    { id: 'v-studio-leads', p: 'studio', title: 'Studio: three ways to start a project', article: 'studio-lead-ways', yt: '' },
+    { id: 'v-go', p: 'go', title: 'Go: recording site work in the checklist', article: 'go-site-updates', yt: '' },
+    { id: 'v-go-bid', p: 'go', title: 'Go: finding and bidding on jobs', article: 'go-bid-board', yt: '' },
+    { id: 'v-connect', p: 'connect', title: 'Connect: find your roof and get an estimate', article: 'connect-create-project', yt: '' },
+    { id: 'v-connect-pay', p: 'connect', title: 'Connect: approve, sign and pay', article: 'connect-agreement', yt: '' },
+    { id: 'v-scada', p: 'scada', title: 'SCADA: from alert to fix', article: 'scada-work-orders', yt: '' },
+    { id: 'v-artha', p: 'artha', title: 'Artha: how it works and the risks', article: 'artha-what', yt: '' }
   ],
 
   /* Learning paths shown in the signed-in workspace */
