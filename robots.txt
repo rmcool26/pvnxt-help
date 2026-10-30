@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /my.html
+Disallow: /signin.html
+Disallow: /search.html
+Sitemap: https://help.pvnxt.com/sitemap.xml
