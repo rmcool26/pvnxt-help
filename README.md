@@ -7,16 +7,17 @@ Built on the terranxt.com design system: `css/styles.css` is copied unchanged fr
 
 | Page | File | What it does |
 |---|---|---|
-| Home | `index.html` | Search across all portals, portal tiles, guides by role, common questions, videos, contact |
-| Portal | `portal.html?p=studio` | One portal's guides by topic, its demos, link to open the portal |
-| Guide | `article.html?a=sign-up` | Step-by-step guide, side nav, save, copy link, feedback, prev/next |
-| Videos | `videos.html` (`#studio` filters) | Demo videos by portal, learning paths |
-| Search | `search.html?q=boq` | Results across guides and videos |
-| Contact | `contact.html?portal=go&topic=...` | Request form with guide suggestions; sends via the visitor's email app |
-| Status | `status.html` | Portal status, updated by hand in `js/data.js` |
-| Sign in | `signin.html` | Demo sign-in (no password check) |
-| My help | `my.html` (`#requests`, `#saved`, `#learning`) | Signed-in workspace: requests, saved guides, learning progress |
-| 404 | `404.html` | Not found, with search |
+| All guides | `guides.html#go` | Portal list on the left (chips on mobile), one portal's guides by topic with summaries |
+| Home | `index.html` | One search, portal tiles, common questions by portal |
+| Portal | `portal.html?p=studio#design` | One portal's guides in a topic accordion |
+| Guide | `article.html?a=studio-roof-analysis` | Steps with screenshots, guide list, sticky "In this guide", next guide |
+| Search | `search.html?q=roof&p=studio` | One list with portal chips, "Show more", "Ask support about …" |
+| Contact | `contact.html?portal=go&topic=...` | Form with guide suggestions + WhatsApp/email; sends via the visitor's email app |
+| Videos | `videos.html#v-studio` or `#go` | Player + playlist; "Coming soon" opens the written guide until a YouTube id is added |
+| Status | `status.html` | Summary banner + one row per portal, "Report a problem" |
+| Sign in | `signin.html` | Existing accounts only: email first, portal detected, password or code, Google/Microsoft/Apple |
+| My help | `my.html#requests`, `#saved`, `#progress` | Tabs: requests, saved guides, reading progress |
+| 404 | `404.html` | Search, popular guides, "Report a broken link" |
 
 Portal ids: `atlas`, `studio`, `go`, `connect`, `scada`, `artha`, `apps`, `account`.
 
@@ -38,7 +39,20 @@ The site uses only real screenshots from the portals (`assets/guides/`). There a
 
 ## Sign-in
 
-`signin.html` is a demo. It stores the user, requests, saved guides and reading progress in the browser (`localStorage`). To go live, replace `R.signin` and `user()` in `js/help.js` with pvNXT single sign-on, and send contact requests to a helpdesk or API instead of `mailto:`.
+`signin.html` is a demo. Rules for the real version: **no sign-up on help** (accounts are created in the portals) and **one email belongs to one portal**.
+Flow: email (or Google / Microsoft / Apple) → look up the account → show "Studio account" → password or one-time code → `my.html`.
+Until the pvNXT account API is connected, four test emails are recognised (`studio@`, `go@`, `connect@`, `scada@demo.pvnxt.com`); any other email gets a labelled "Demo only" portal choice. Replace `R.signin` and `user()` in `js/help.js` with the real API, and send contact requests to a helpdesk instead of `mailto:`.
+
+## “Ask us” assistant
+
+The chat button (every page except Contact and Sign in) answers from the guides.
+- **Live AI answers:** `api/chat.js` is a Vercel function. In Vercel → Settings → Environment Variables add `ANTHROPIC_API_KEY` (and optionally `CHAT_MODEL`, default `claude-haiku-5-5`). It finds the 4 closest guides in `js/data.js` and the model answers only from them, in the visitor's language, with links to the guides. Basic per-minute rate limit included; add a stronger one (e.g. Vercel KV) before heavy use.
+- **Without a key** (or if the API fails) it falls back to a local answer: the best-matching guide's summary and first steps plus links.
+- Every answer offers WhatsApp, email and “Raise a request” (pre-filled with the question).
+
+## Language
+
+The globe button (EN / हिन्दी / العربية) uses the Google Translate website widget: it sets the `googtrans` cookie and reloads. Arabic switches the page to right-to-left. Portal names and the logo are marked not to translate. Translation is machine quality; the menu says so. It does not run in local `file://` previews or inside the claude.ai preview (blocked there), only on the real site.
 
 ## Deploy
 

@@ -86,30 +86,130 @@
     });
   }
 
+  /* ---------- language (Google Translate) ---------- */
+  function curLang() { var m = document.cookie.match(/(?:^|;\s*)googtrans=\/[a-z-]+\/([a-z-]+)/i); return m && /^(hi|ar)$/.test(m[1]) ? m[1] : 'en'; }
+  function setLang(l) {
+    var host = location.hostname, past = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    var doms = ['', host, '.' + host.split('.').slice(-2).join('.')];
+    doms.forEach(function (d) { document.cookie = 'googtrans=; ' + past + '; path=/' + (d ? '; domain=' + d : ''); });
+    if (l !== 'en') document.cookie = 'googtrans=/en/' + l + '; path=/';
+    try { localStorage.setItem('pvh_lang', l); } catch (e) { }
+    location.reload();
+  }
+  function initLang() {
+    var l = curLang();
+    document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    if (l === 'en' || location.protocol === 'file:') return;
+    window.gtInit = function () { try { new google.translate.TranslateElement({ pageLanguage: 'en', includedLanguages: 'hi,ar', autoDisplay: false }, 'gt-el'); } catch (e) { } };
+    var d = document.createElement('div'); d.id = 'gt-el'; d.hidden = true; document.body.appendChild(d);
+    var sc = document.createElement('script'); sc.src = 'https://translate.google.com/translate_a/element.js?cb=gtInit'; sc.async = true; document.body.appendChild(sc);
+  }
+
+  /* ---------- "Ask us" assistant: answers from the guides, then a person ---------- */
+  function chatWidget() {
+    if (page === 'contact' || page === 'signin') return;
+    var KEY = 'pvh_chat', log = [];
+    try { log = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { log = []; }
+    function save() { try { sessionStorage.setItem(KEY, JSON.stringify(log.slice(-20))); } catch (e) { } }
+    var fab = document.createElement('button');
+    fab.type = 'button'; fab.className = 'cx-fab'; fab.setAttribute('aria-haspopup', 'dialog'); fab.setAttribute('aria-expanded', 'false'); fab.setAttribute('aria-controls', 'cx');
+    fab.innerHTML = ic('message-circle') + '<span>Ask us</span>';
+    var box = document.createElement('section');
+    box.className = 'cx'; box.id = 'cx'; box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-labelledby', 'cx-t');
+    var sug = H.popular.slice(0, 3).map(A).filter(Boolean);
+    box.innerHTML = '<div class="cx-h"><div><b id="cx-t">Ask pvNXT Help</b><span>Answers come from our guides</span></div><button type="button" class="cx-x" aria-label="Close">' + ic('x') + '</button></div>'
+      + '<div class="cx-b" id="cx-b" aria-live="polite"></div>'
+      + '<form class="cx-f" id="cx-f"><label class="sr" for="cx-q">Your question</label><textarea id="cx-q" rows="1" maxlength="500" placeholder="Ask about Studio, Go, Connect…"></textarea><button type="submit" class="cx-send" aria-label="Send">' + ic('arrow-up') + '</button></form>'
+      + '<div class="cx-p"><span>Talk to a person</span><a href="' + H.support.whatsapp + '" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:' + H.support.email + '">Email</a><a href="contact.html" id="cx-req">Raise a request</a></div>';
+    document.body.appendChild(fab); document.body.appendChild(box);
+    var body = box.querySelector('#cx-b'), q = box.querySelector('#cx-q'), req = box.querySelector('#cx-req'), busy = false;
+    function fmt(t) {
+      t = esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+      var lines = t.split(/\n+/), out = '', inList = false;
+      lines.forEach(function (l) { var m = l.match(/^\s*(\d+)[.)]\s+(.*)/); if (m) { if (!inList) { out += '<ol>'; inList = true; } out += '<li>' + m[2] + '</li>'; } else { if (inList) { out += '</ol>'; inList = false; } if (l.trim()) out += '<p>' + l + '</p>'; } });
+      return out + (inList ? '</ol>' : '');
+    }
+    function srcs(list) { return list && list.length ? '<div class="cx-src"><span>From the guides</span>' + list.map(function (a) { return '<a href="article.html?a=' + a.id + '">' + esc(a.title) + '</a>'; }).join('') + '</div>' : ''; }
+    function render() {
+      body.innerHTML = '<div class="cx-m bot"><p>Hi. Ask a question and I’ll answer from the pvNXT guides. If I can’t help, you can reach a person below.</p>'
+        + (log.length ? '' : '<div class="cx-sug">' + sug.map(function (a) { return '<button type="button" data-q="' + esc(a.title) + '">' + esc(a.title) + '</button>'; }).join('') + '</div>') + '</div>'
+        + log.map(function (m) { return m.r === 'u' ? '<div class="cx-m me"><p>' + esc(m.t) + '</p></div>' : '<div class="cx-m bot">' + fmt(m.t) + srcs(m.s) + '</div>'; }).join('');
+      [].forEach.call(body.querySelectorAll('[data-q]'), function (b) { b.addEventListener('click', function () { ask(b.dataset.q); }); });
+      body.scrollTop = body.scrollHeight; icons();
+    }
+    function local(text) {
+      var r = search(text, 'all').a.slice(0, 3);
+      if (!r.length) return { t: 'I couldn’t find a guide for that. Try other words, or ask a person below. We reply within one working day.', s: [] };
+      var a = r[0], st = (a.body.filter(function (b) { return b[0] === 'steps'; })[0] || [])[1] || [];
+      var t = '**' + a.title + '**\n' + a.sum + (st.length ? '\n' + st.slice(0, 5).map(function (x, i) { return (i + 1) + '. ' + strip(x); }).join('\n') : '') + (st.length > 5 ? '\nThe guide has the remaining steps.' : '');
+      return { t: t, s: r.map(function (x) { return { id: x.id, title: x.title }; }) };
+    }
+    function ask(text) {
+      text = (text || '').trim(); if (!text || busy) return;
+      busy = true; log.push({ r: 'u', t: text }); save(); render();
+      req.href = 'contact.html?topic=' + encodeURIComponent(text.slice(0, 80));
+      var wait = document.createElement('div'); wait.className = 'cx-m bot cx-wait'; wait.innerHTML = '<p>Looking through the guides…</p>'; body.appendChild(wait); body.scrollTop = body.scrollHeight;
+      function done(ans) { busy = false; log.push({ r: 'b', t: ans.t, s: ans.s }); save(); render(); }
+      if (location.protocol === 'file:' || !window.fetch) { setTimeout(function () { done(local(text)); }, 300); return; }
+      var hist = log.slice(-7, -1).map(function (m) { return { role: m.r === 'u' ? 'user' : 'assistant', content: m.t }; });
+      var ctl = window.AbortController ? new AbortController() : null, tm = setTimeout(function () { if (ctl) ctl.abort(); }, 20000);
+      fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: hist, lang: curLang() }), signal: ctl ? ctl.signal : undefined })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (d) { clearTimeout(tm); if (!d || !d.answer) throw new Error('empty'); done({ t: d.answer, s: (d.sources || []).filter(function (x) { return A(x.id); }) }); })
+        .catch(function () { clearTimeout(tm); done(local(text)); });
+    }
+    function open(v) {
+      box.hidden = !v; fab.hidden = v; fab.setAttribute('aria-expanded', v); document.body.classList.toggle('cx-on', v);
+      if (v) { render(); setTimeout(function () { q.focus(); }, 30); } else fab.focus();
+    }
+    fab.addEventListener('click', function () { open(true); });
+    /* on phones, step out of the way while reading down; come back when scrolling up or at the end */
+    var lastY = window.scrollY;
+    window.addEventListener('scroll', function () {
+      if (window.innerWidth > 600) { fab.classList.remove('cx-away'); return; }
+      var y = window.scrollY, end = y + window.innerHeight >= document.documentElement.scrollHeight - 80;
+      fab.classList.toggle('cx-away', y > lastY + 4 && y > 200 && !end);
+      if (y < lastY - 4 || end) fab.classList.remove('cx-away');
+      lastY = y;
+    }, { passive: true });
+    box.querySelector('.cx-x').addEventListener('click', function () { open(false); });
+    box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); open(false); } });
+    box.querySelector('#cx-f').addEventListener('submit', function (e) { e.preventDefault(); var v = q.value; q.value = ''; q.style.height = ''; ask(v); });
+    q.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); box.querySelector('#cx-f').dispatchEvent(new Event('submit', { cancelable: true })); } });
+    q.addEventListener('input', function () { q.style.height = ''; q.style.height = Math.min(q.scrollHeight, 120) + 'px'; });
+    icons();
+  }
+
   /* ---------- header & footer ---------- */
   function layout() {
-    var u = user(), chev = ic('chevron-down');
+    initLang(); var u = user(), chev = ic('chevron-down');
     var on = function (k) { return page === k ? ' class="on"' : ''; };
     var portalItems = H.portals.map(function (p) { return '<a class="item" href="portal.html?p=' + p.id + '"><span class="dd-ic">' + ic(p.icon) + '</span><span><b>' + esc(p.name) + '</b><span>' + esc(p.line) + '</span></span></a>'; }).join('');
-    var initials = u ? (u.name || u.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(function (s) { return s[0].toUpperCase(); }).join('') : '';
+    var initials = u ? (u.name || u.email.split('@')[0]).split(/[\s._-]+/).filter(Boolean).slice(0, 2).map(function (s) { return s[0].toUpperCase(); }).join('') : '';
     var acct = u
-      ? '<div class="has-dd umenu"><button type="button" aria-haspopup="true" aria-expanded="false" class="ubtn"><span class="avatar">' + esc(initials) + '</span><span class="uname">' + esc((u.name || u.email).split(' ')[0]) + '</span>' + chev + '</button><div class="dd dd-user"><div class="dd-who"><b>' + esc(u.name || 'Signed in') + '</b><span>' + esc(u.email) + '</span></div><a class="item" href="my.html">' + ic('layout-dashboard') + 'My help</a><a class="item" href="my.html#requests">' + ic('inbox') + 'My requests</a><a class="item" href="my.html#saved">' + ic('bookmark') + 'Saved guides</a><a class="item" href="my.html#learning">' + ic('graduation-cap') + 'Learning paths</a><button type="button" class="item" data-signout>' + ic('log-out') + 'Sign out</button></div></div>'
+      ? '<div class="has-dd umenu"><button type="button" aria-haspopup="true" aria-expanded="false" class="ubtn"><span class="avatar">' + esc(initials) + '</span><span class="uname">' + esc(u.name ? u.name.split(' ')[0] : u.email.split('@')[0]) + '</span>' + chev + '</button><div class="dd dd-user"><div class="dd-who"><b>' + esc(u.name || 'Signed in') + '</b><span>' + esc(u.email) + '</span></div><a class="item" href="my.html">' + ic('layout-dashboard') + 'My help</a><a class="item" href="my.html#requests">' + ic('inbox') + 'My requests</a><a class="item" href="my.html#saved">' + ic('bookmark') + 'Saved guides</a><a class="item" href="my.html#progress">' + ic('graduation-cap') + 'Reading progress</a><button type="button" class="item" data-signout>' + ic('log-out') + 'Sign out</button></div></div>'
       : '<a class="btn sm ghost" href="signin.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) + '">' + ic('log-in') + 'Sign in</a>';
     var hs = page === 'home' || page === 'search' ? '' : '<form class="hsearch" action="search.html" role="search" data-suggest>' + ic('search') + '<label class="sr" for="hq">Search help</label><input id="hq" name="q" type="search" autocomplete="off" placeholder="Search help"><kbd class="kbd" aria-hidden="true">/</kbd><div class="sugg" hidden></div></form>';
-    var h = '<header class="hdr" id="hdr"><div class="wrap hdr-in">'
-      + '<a class="logo hlogo" href="index.html" aria-label="pvNXT Help home"><img src="assets/logos/terranxt.png" alt="Terranxt"><span class="hl-name">pvNXT <b>Help</b></span></a>'
-      + '<ul class="nav">'
-      + '<li class="has-dd"><button type="button" aria-haspopup="true" aria-expanded="false"' + (page === 'portal' || page === 'article' ? ' class="on"' : '') + '>Portals ' + chev + '</button><div class="dd dd-portals">' + portalItems + '<div class="dd-foot"><a href="index.html#portals">All portals</a> · <a href="article.html?a=which-portal">Which portal is mine?</a></div></div></li>'
-      + '<li><a href="videos.html"' + on('videos') + '>Videos</a></li>'
-      + '<li><a href="contact.html"' + on('contact') + '>Contact</a></li>'
-      + '<li><a href="status.html"' + on('status') + '>Status</a></li></ul>'
-      + hs + '<div class="hdr-cta">' + acct + '<a class="btn sm" href="contact.html">Get support</a></div>'
-      + '<button class="burger" id="burger" aria-label="Menu" aria-expanded="false">' + ic('menu') + '</button></div>'
-      + '<nav class="mnav" aria-label="Mobile">' + '<form class="hsearch m" action="search.html" role="search" data-suggest>' + ic('search') + '<label class="sr" for="mq">Search help</label><input id="mq" name="q" type="search" autocomplete="off" placeholder="Search help"><div class="sugg" hidden></div></form>'
-      + '<a href="index.html">Help home</a><div class="sub">' + H.portals.map(function (p) { return '<a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a>'; }).join('') + '</div>'
-      + '<a href="videos.html">Videos</a><a href="contact.html">Contact</a><a href="status.html">Status</a>'
-      + (u ? '<a href="my.html">My help</a><button type="button" class="mlink" data-signout>Sign out</button>' : '<a href="signin.html">Sign in</a>')
-      + '<a class="btn" href="contact.html">Get support</a></nav></header>';
+    var LANGS = [['en', 'English', 'EN'], ['hi', 'हिन्दी', 'HI'], ['ar', 'العربية', 'AR']], cur = curLang();
+    var langItems = LANGS.map(function (l) { return '<button type="button" class="item" data-lang="' + l[0] + '" lang="' + l[0] + '" translate="no"' + (l[0] === cur ? ' aria-current="true"' : '') + '>' + l[1] + '</button>'; }).join('');
+    var navOn = function (k) { return (Array.isArray(k) ? k.indexOf(page) > -1 : page === k) ? ' aria-current="page"' : ''; };
+    var h = '<header class="hdr hx" id="hdr"><div class="hx-in">'
+      + '<a class="hx-logo" href="index.html" aria-label="pvNXT Help home" translate="no"><img src="assets/logos/mark.png" alt=""><span>pvNXT Help</span></a>'
+      + '<nav class="hx-nav" aria-label="Main"><ul>'
+      + '<li class="has-dd"><button type="button" aria-haspopup="true" aria-expanded="false"' + (page === 'portal' ? ' aria-current="page"' : '') + '>Portals ' + chev + '</button><div class="dd dd-portals">' + portalItems + '<div class="dd-foot"><a href="guides.html">All guides</a> · <a href="article.html?a=which-portal">Which portal is mine?</a></div></div></li>'
+      + '<li><a href="guides.html"' + navOn(['guides', 'article']) + '>Guides</a></li>'
+      + '<li><a href="videos.html"' + navOn('videos') + '>Videos</a></li>'
+      + '<li><a href="status.html"' + navOn('status') + '>Status</a></li>'
+      + '<li><a href="contact.html"' + navOn('contact') + '>Contact</a></li></ul></nav>'
+      + '<div class="hx-r">' + hs
+      + '<div class="has-dd hx-lang"><button type="button" aria-haspopup="true" aria-expanded="false" aria-label="Language: ' + LANGS.filter(function (l) { return l[0] === cur; })[0][1] + '">' + ic('globe') + '<span translate="no">' + LANGS.filter(function (l) { return l[0] === cur; })[0][2] + '</span></button><div class="dd dd-lang">' + langItems + '<p class="dd-note">Translated by Google. Steps and button names may differ from the portal.</p></div></div>'
+      + '<div class="hx-acct">' + acct + '</div>'
+      + '<button class="hx-burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="mnav">' + ic('menu') + '</button></div></div>'
+      + '<nav class="hx-m" id="mnav" aria-label="Menu">'
+      + '<a href="index.html"' + navOn('home') + '>Help home</a><a href="guides.html"' + navOn(['guides', 'article']) + '>Guides</a><a href="videos.html"' + navOn('videos') + '>Videos</a><a href="status.html"' + navOn('status') + '>Status</a><a href="contact.html"' + navOn('contact') + '>Contact</a>'
+      + '<span class="hx-mh">Portals</span><div class="hx-mp" translate="no">' + H.portals.map(function (p) { return '<a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a>'; }).join('') + '</div>'
+      + '<span class="hx-mh">Language</span><div class="hx-ml">' + langItems + '</div>'
+      + '<div class="hx-mu">' + (u ? '<a href="my.html">My help</a><button type="button" class="link" data-signout>Sign out</button>' : '<a class="btn" href="signin.html">Sign in</a>') + '</div></nav></header>';
 
     var used = {}; [].forEach.call(document.querySelectorAll('[data-credit]'), function () { });
     var f = '<footer class="ftr"><div class="wrap ftr-main"><div class="ftr-cols">'
@@ -120,6 +220,10 @@
       + '<div><h6>Terranxt</h6><ul><li><a href="' + H.support.site + '" target="_blank" rel="noopener">terranxt.com</a></li><li><a href="' + H.support.site + '/how-it-works.html" target="_blank" rel="noopener">How it works</a></li><li><a href="' + H.support.demo + '" target="_blank" rel="noopener">Request a demo</a></li><li><a href="' + H.support.site + '/privacy.html" target="_blank" rel="noopener">Privacy</a></li><li><a href="' + H.support.site + '/terms.html" target="_blank" rel="noopener">Terms</a></li></ul></div>'
       + '</div><div class="ftr-base"><span>© ' + new Date().getFullYear() + ' Terranxt Pvt Ltd. A pvNXT company. IIT Delhi–FITT incubated. Backed by Astongreens.</span><span>Screenshots are from the live portals. Personal details are blurred.</span></div></div></footer>';
 
+    document.body.classList.add('min'); if (page === 'home') document.body.classList.add('is-home');
+    {
+      f = '<footer class="mf"><div class="mf-in"><span>© ' + new Date().getFullYear() + ' Terranxt Pvt Ltd</span>' + (page !== 'home' ? '<a href="contact.html">Contact</a><a href="status.html">Status</a><a href="videos.html">Videos</a>' : '') + '<a href="' + H.support.site + '/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="' + H.support.site + '/terms.html" target="_blank" rel="noopener">Terms</a><a href="' + H.support.site + '" target="_blank" rel="noopener">terranxt.com</a></div></footer>';
+    }
     document.getElementById('site-header').outerHTML = h;
     document.getElementById('site-footer').outerHTML = f;
     var hd = document.getElementById('hdr'), b = document.getElementById('burger');
@@ -150,11 +254,14 @@
       }
     });
     [].forEach.call(document.querySelectorAll('[data-signout]'), function (x) { x.addEventListener('click', function () { try { localStorage.removeItem('pvh_user'); } catch (e) { } location.href = 'index.html'; }); });
+    [].forEach.call(document.querySelectorAll('[data-lang]'), function (x) { x.addEventListener('click', function () { if (x.dataset.lang !== curLang()) setLang(x.dataset.lang); else closeAll(); }); });
     /* skip link, WhatsApp, back to top (same as terranxt.com) */
     var sk = document.createElement('a'); sk.className = 'skip'; sk.href = '#main'; sk.textContent = 'Skip to content'; document.body.insertBefore(sk, document.body.firstChild);
     main.tabIndex = -1;
+    if (false) {
     var wa = document.createElement('a'); wa.className = 'wa-fab'; wa.href = H.support.whatsapp; wa.target = '_blank'; wa.rel = 'noopener noreferrer'; wa.setAttribute('aria-label', 'Chat with pvNXT support on WhatsApp');
     wa.innerHTML = ic('message-circle') + '<span>WhatsApp</span>'; document.body.appendChild(wa);
+    }
     var tt = document.createElement('button'); tt.type = 'button'; tt.className = 'to-top'; tt.setAttribute('aria-label', 'Back to top'); tt.innerHTML = ic('chevron-up'); document.body.appendChild(tt);
     tt.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
     window.addEventListener('scroll', function () { tt.classList.toggle('show', window.scrollY > 700); }, { passive: true });
@@ -204,61 +311,85 @@
   var R = {};
 
   R.home = function () {
-    title(''); var u = user();
-    var chips = [['Register a new lead', 'studio-add-lead'], ['Verify an installer account', 'go-verify-account'], ['Draw your roof boundary', 'connect-measure-roof'], ['Assign an installer', 'studio-assign-installer'], ['Reset a password', 'reset-password']];
-    var roles = [['studio', 'I run an EPC or sales team', 'Leads, bids, roof design, BOQ and proposals'], ['go', 'I install on site', 'Bids, the site checklist and handover'], ['connect', 'I’m going solar at home or work', 'Your roof, the estimate, agreement and payment'], ['scada', 'I look after a running plant', 'Alerts and work orders'], ['artha', 'I want to invest', 'How Artha works, and its risks']];
-    var lead = A('studio-roof-analysis'), side = [A('go-site-updates'), A('connect-install-path')];
-    function feat(a, big) {
-      var p = P(a.p);
-      return '<a class="feat' + (big ? ' big' : '') + '" href="article.html?a=' + a.id + '"><span class="feat-img">' + shot(firstShot(a), '', '') + '</span><span class="feat-t"><span class="tg">' + esc(p.name) + '</span><b>' + esc(a.title) + '</b><span>' + esc(a.sum) + '</span></span></a>';
-    }
+    title('');
+    /* Questions people ask per portal: a one-line answer here, the full guide one click away */
+    var faq = [
+      { id: 'studio', items: ['studio-add-lead', 'studio-roof-analysis', 'studio-layout', 'studio-proposal', 'studio-assign-installer'] },
+      { id: 'go', items: ['go-verify-account', 'go-bid-board', 'go-submit-bid', 'go-site-updates', 'go-close-project'] },
+      { id: 'connect', items: ['connect-create-project', 'connect-measure-roof', 'connect-install-path', 'connect-agreement', 'connect-track'] },
+      { id: 'scada', items: ['scada-add-plant', 'scada-inverters', 'scada-alerts', 'scada-work-orders'] },
+      { id: 'artha', items: ['artha-what', 'artha-risk', 'artha-join'] },
+      { id: 'account', items: ['sign-up', 'reset-password', 'which-portal', 'give-access', 'data-safety'] }
+    ];
+    var label = { account: 'Account' };
+    var start = (location.hash || '').slice(1); if (!faq.some(function (f) { return f.id === start; })) start = 'studio';
     set(
-      '<section class="page-hero home-hero"><div class="wrap home-in">'
-      + '<div class="hh-l"><span class="eyebrow"><span class="dot"></span>pvNXT Help</span>'
-      + '<h1>Find the step you’re on.</h1><p class="lead">Step-by-step guides for Studio, Go and Connect, with screenshots from the live portals.</p>'
-      + searchBox({ big: true, ph: 'Try “keepout zone”', rotate: 'keepout zone|Self Mode|Cost per Wp|register a new lead|draw roof boundary|assign an installer|reset password' })
-      + '<div class="chips"><span class="chips-l">Start with</span>' + chips.map(function (c) { return '<a class="chip" href="article.html?a=' + c[1] + '">' + c[0] + '</a>'; }).join('') + '</div></div>'
-      + '<nav class="picker" aria-label="Guides by role"><span class="picker-h">Which one are you?</span>'
-      + roles.map(function (r) { var p = P(r[0]); return '<a href="portal.html?p=' + p.id + '"><span class="pk-i">' + ic(p.icon) + '</span><span class="pk-t"><b>' + esc(r[1]) + '</b><span>' + esc(r[2]) + '</span></span><span class="pk-p">' + esc(p.name) + ic('arrow-right') + '</span></a>'; }).join('')
-      + '<span class="pk-foot">' + (u ? '<a href="my.html">Open my help</a>: your requests, saved guides and progress.' : '<a href="signin.html?next=my.html">Sign in</a> to track your requests and save guides. Every guide stays open without signing in.') + '</span></nav>'
+      '<section class="mh"><span class="mh-grid" aria-hidden="true"></span><div class="mh-in">'
+      + '<h1>What do you need help with?</h1>'
+      + searchBox({ ph: 'Describe your issue', rotate: 'Describe your issue|keepout zone|Self Mode|Cost per Wp|reset password' })
       + '</div></section>'
 
-      + '<section class="sec"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Start here</span><h2>The main job in each portal</h2></div><p class="muted">Each guide follows the portal screen by screen.</p></div>'
-      + '<div class="feats">' + feat(lead, true) + '<div class="feats-s">' + side.map(function (a) { return feat(a, false); }).join('') + '</div></div></div></section>'
+      + '<nav class="mp" aria-label="Portals"><div class="mp-in">'
+      + ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'apps', 'account'].map(P).map(function (p) { return '<a href="portal.html?p=' + p.id + '"><span class="mp-i">' + ic(p.icon) + '</span><span>' + esc(p.id === 'apps' ? 'Mobile apps' : p.id === 'account' ? 'Account' : p.name) + '</span></a>'; }).join('')
+      + '</div></nav>'
 
-      + '<section class="sec tint" id="portals"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Guides by portal</span><h2>All portals share one project record</h2></div><p class="muted">A design from Studio becomes the task list in Go and the proposal in Connect, so the guides link across portals.</p></div>'
-      + '<div class="prows">' + H.portals.map(function (p) { var n = inPortal(p.id).length; return '<a class="prow" href="portal.html?p=' + p.id + '"><span class="prow-n">' + ic(p.icon) + '<b>' + esc(p.name) + '</b></span><span class="prow-l">' + esc(p.line) + '</span><span class="prow-h">' + (p.host || esc(p.tag)) + '</span><span class="prow-c">' + n + ' guide' + (n === 1 ? '' : 's') + ic('arrow-right') + '</span></a>'; }).join('') + '</div></div></section>'
-      + helpBand()
+      + '<section class="mq" aria-labelledby="mq-h"><div class="mq-in">'
+      + '<h2 id="mq-h">Common questions</h2>'
+      + '<div class="mq-tabs" role="tablist" aria-label="Choose a portal">' + faq.map(function (f) { var p = P(f.id); return '<button type="button" role="tab" id="mqt-' + f.id + '" aria-controls="mqp" aria-selected="' + (f.id === start) + '" tabindex="' + (f.id === start ? 0 : -1) + '" data-f="' + f.id + '">' + esc(label[f.id] || p.name) + '</button>'; }).join('') + '</div>'
+      + '<div class="mq-panel" id="mqp" role="tabpanel" tabindex="0"></div>'
+      + '</div></section>'
+
+      + '<section class="ml"><div class="ml-in">'
+      + '<div><h3>Your account</h3><a href="article.html?a=reset-password">Reset your password</a><a href="article.html?a=which-portal">Which portal is mine?</a><a href="' + (user() ? 'my.html' : 'signin.html?next=my.html') + '">' + (user() ? 'My requests and saved guides' : 'Sign in to track requests') + '</a></div>'
+      + '<div><h3>Learn</h3><a href="videos.html">Videos and learning paths</a><a href="portal.html?p=apps">Mobile apps</a><a href="status.html">Portal status</a></div>'
+      + '<div><h3>Talk to a person</h3><p>We reply within one working day.</p><a href="contact.html">Contact support</a><a href="' + H.support.whatsapp + '" target="_blank" rel="noopener">WhatsApp, ' + esc(H.support.hours) + '</a></div>'
+      + '</div></section>'
     );
+    var panel = document.getElementById('mqp'), tabs = [].slice.call(main.querySelectorAll('.mq-tabs [role=tab]'));
+    function draw(id) {
+      var f = faq.filter(function (x) { return x.id === id; })[0], p = P(id);
+      tabs.forEach(function (t) { var on = t.dataset.f === id; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+      panel.setAttribute('aria-labelledby', 'mqt-' + id);
+      panel.innerHTML = f.items.map(A).filter(Boolean).map(function (a) {
+        return '<details><summary><span>' + esc(a.title) + '</span>' + ic('chevron-down', 'mq-c') + '</summary><div class="mq-a"><p>' + esc(a.sum) + '</p><a href="article.html?a=' + a.id + '">Read the steps ' + ic('arrow-right') + '</a></div></details>';
+      }).join('') + '<a class="mq-all" href="portal.html?p=' + id + '">All ' + inPortal(id).length + ' ' + esc(label[id] || p.name) + ' guides ' + ic('arrow-right') + '</a>';
+      icons();
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () { draw(t.dataset.f); history.replaceState(null, '', '#' + t.dataset.f); });
+      t.addEventListener('keydown', function (e) {
+        var k = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!k) return;
+        e.preventDefault(); var n = tabs[(i + k + tabs.length) % tabs.length]; n.focus(); n.click();
+      });
+    });
+    draw(start);
     wireSuggest();
   };
 
   R.portal = function () {
     var p = P(qs('p')); if (!p) return R['404']();
     title(p.name + ' help');
-    var arts = inPortal(p.id), vids = H.videos.filter(function (v) { return v.p === p.id && v.yt; });
-    var others = H.portals.filter(function (x) { return x.id !== p.id; });
-    var right = p.shot
-      ? '<figure class="phero-img"><button type="button" class="zoom" data-zoom="' + p.shot + '" data-cap="' + esc(p.name) + ' as it looks today" aria-label="Enlarge ' + esc(p.name) + ' screenshot">' + shot(p.shot, '', p.name + ' screenshot') + '<span class="zoom-i">' + ic('maximize-2') + '</span></button><figcaption>' + esc(p.name) + ' as it looks today.</figcaption></figure>'
-      : '<dl class="pfacts"><div><dt>For</dt><dd>' + esc(p.who) + '</dd></div>' + (p.host ? '<div><dt>Address</dt><dd>' + p.host + '</dd></div>' : '') + '<div><dt>Status</dt><dd>' + esc(p.tag) + '</dd></div><div><dt>Guides</dt><dd>' + arts.length + '</dd></div></dl>';
+    var arts = inPortal(p.id), want = (location.hash || '').slice(1);
+    var openId = p.topics.some(function (t) { return t.id === want; }) ? want : p.topics[0].id;
     set(
-      '<section class="page-hero phero"><div class="wrap phero-in"><div class="stack">' + crumbs([[p.name + ' help']])
-      + '<span class="eyebrow"><span class="dot"></span>' + esc(p.tag) + (p.host ? ' · ' + p.host : '') + '</span><h1>' + esc(p.name) + ' help</h1><p class="lead">' + esc(p.line) + ' For ' + esc(p.who.charAt(0).toLowerCase() + p.who.slice(1)) + '.</p>'
-      + searchBox({ p: p.id, ph: 'Search ' + p.name + ' guides' })
-      + (p.url ? '<div class="cta-row"><a class="btn ghost" href="' + p.url + '" target="_blank" rel="noopener">Open ' + esc(p.name) + ' ' + ic('external-link') + '</a></div>' : '') + '</div>'
-      + right + '</div></section>'
-
-      + '<section class="sec"><div class="wrap topics">' + p.topics.map(function (t) {
-        var list = arts.filter(function (a) { return a.t === t.id; });
-        return '<div class="topic"><h2 class="topic-h">' + esc(t.name) + '<span>' + list.length + '</span></h2><div class="alist">' + list.map(function (a) { return artRow(a, false); }).join('') + '</div></div>';
-      }).join('') + '</div></section>'
-
-      + (vids.length ? '<section class="sec tight tint"><div class="wrap"><div class="sec-row"><div class="stack-s"><span class="eyebrow">Videos</span><h2 class="h3x">' + esc(p.name) + ' demos</h2></div><a class="link" href="videos.html#' + p.id + '">All videos ' + arrow() + '</a></div><div class="vgrid">' + vids.map(vidCard).join('') + '</div></div></section>' : '')
-
-      + '<section class="sec tight"><div class="wrap"><div class="sec-row"><h2 class="h3x">Other portals</h2></div><div class="olist">' + others.map(function (o) { return '<a class="ochip" href="portal.html?p=' + o.id + '">' + ic(o.icon) + esc(o.name) + '</a>'; }).join('') + '</div></div></section>'
-      + helpBand()
+      '<div class="ptl">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">' + esc(p.name) + '</span></nav>'
+      + '<div class="ptl-head"><span class="ptl-ic">' + ic(p.icon) + '</span><div><h1>' + esc(p.name) + ' help</h1><p>' + esc(p.who) + '</p></div></div>'
+      + searchBox({ p: p.id, ph: 'Search ' + p.name + ' help' })
+      + '<section class="ptl-topics" aria-labelledby="ptl-th"><h2 id="ptl-th">Browse help topics</h2><div class="ptl-acc">'
+      + p.topics.map(function (t) {
+          var l = arts.filter(function (x) { return x.t === t.id; });
+          return '<details id="' + t.id + '"' + (t.id === openId ? ' open' : '') + '><summary><span><b>' + esc(t.name) + '</b><em>' + l.length + ' guide' + (l.length === 1 ? '' : 's') + '</em></span>' + ic('chevron-down', 'ptl-c') + '</summary><ul>'
+            + l.map(function (x) { return '<li><a href="article.html?a=' + x.id + '">' + esc(x.title) + '</a></li>'; }).join('') + '</ul></details>';
+        }).join('')
+      + '</div></section>'
+      + '<p class="ptl-help">Can’t find it? <a href="contact.html?portal=' + p.id + '">Contact support</a>. We reply within one working day.</p>'
+      + (p.url ? '<p class="ptl-open">Using ' + esc(p.name) + ' now? <a href="' + p.url + '" target="_blank" rel="noopener">Open ' + p.host + '</a></p>' : '')
+      + '</div>'
     );
-    wireSuggest(); wireVideos(); wireZoom();
+    /* remember the opened topic in the address, but only when the visitor opens it (not on load, which would scroll) */
+    [].forEach.call(main.querySelectorAll('.ptl-acc summary'), function (sm) { sm.addEventListener('click', function () { var d = sm.parentNode; setTimeout(function () { if (d.open) history.replaceState(null, '', '#' + d.id); }, 0); }); });
+    wireSuggest();
   };
 
   function wireZoom() {
@@ -296,24 +427,31 @@
     title(a.title);
     var read = store.get('pvh_read', []); if (read.indexOf(a.id) < 0) { read.push(a.id); store.set('pvh_read', read); }
     var recent = store.get('pvh_recent', []).filter(function (x) { return x !== a.id; }); recent.unshift(a.id); store.set('pvh_recent', recent.slice(0, 8));
-    var saved = store.get('pvh_saved', []), isSaved = saved.indexOf(a.id) > -1;
+    var isSaved = store.get('pvh_saved', []).indexOf(a.id) > -1;
     var vid = a.video ? V(a.video) : null, topic = p.topics.filter(function (t) { return t.id === a.t; })[0];
-    var prev = list[i - 1], next = list[i + 1];
+    var prev = list[i - 1], next = list[i + 1], src = (H.sources || {})[p.id];
+    var hs = a.body.filter(function (b) { return b[0] === 'h'; }), numbered = hs.length > 1;
+    var navList = p.topics.map(function (t) { return '<p class="gn-h">' + esc(t.name) + '</p><ul>' + list.filter(function (x) { return x.t === t.id; }).map(function (x) { return '<li><a href="article.html?a=' + x.id + '"' + (x.id === a.id ? ' aria-current="page"' : '') + '>' + esc(x.title) + '</a></li>'; }).join('') + '</ul>'; }).join('');
     set(
-      '<div class="wrap art-wrap"><aside class="art-nav" aria-label="' + esc(p.name) + ' guides"><a class="art-nav-p" href="portal.html?p=' + p.id + '">' + ic(p.icon) + esc(p.name) + ' help</a>'
-      + p.topics.map(function (t) { return '<h6>' + esc(t.name) + '</h6><ul>' + list.filter(function (x) { return x.t === t.id; }).map(function (x) { return '<li><a href="article.html?a=' + x.id + '"' + (x.id === a.id ? ' aria-current="page"' : '') + '>' + esc(x.title) + '</a></li>'; }).join('') + '</ul>'; }).join('')
-      + '</aside>'
-      + '<article class="art">' + crumbs([[p.name, 'portal.html?p=' + p.id], [topic ? topic.name : '', 'portal.html?p=' + p.id], [a.title]])
-      + '<h1>' + esc(a.title) + '</h1><p class="lead">' + esc(a.sum) + '</p>'
-      + '<div class="art-meta">' + pill(p.name) + (p.id !== 'artha' && p.id !== 'account' ? '<span>' + ic('monitor-smartphone') + 'Web and app</span>' : '') + '<button type="button" class="art-act" data-save aria-pressed="' + isSaved + '">' + ic(isSaved ? 'bookmark-check' : 'bookmark') + '<span>' + (isSaved ? 'Saved' : u ? 'Save' : 'Sign in to save') + '</span></button><button type="button" class="art-act" data-copy>' + ic('link') + '<span>Copy link</span></button></div>'
-      + '<div class="art-body">' + a.body.map(block).join('') + '</div>'
+      '<div class="gb">'
+      + '<aside class="gn" aria-label="' + esc(p.name) + ' guides"><a class="gn-back" href="portal.html?p=' + p.id + '">' + ic('chevron-left') + esc(p.name) + ' help</a>' + navList + '</aside>'
+      + '<article class="gb-a' + (numbered ? ' num' : '') + '">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a><span aria-hidden="true">›</span><a href="portal.html?p=' + p.id + '#' + a.t + '">' + esc(topic ? topic.name : '') + '</a></nav>'
+      + '<h1>' + esc(a.title) + '</h1>'
+      + '<p class="gb-sub">' + esc(a.sum) + '</p>'
+      + '<div class="gb-acts"><button type="button" class="ga-btn" data-copy>' + ic('link') + '<span>Copy link</span></button><button type="button" class="ga-btn" data-save aria-pressed="' + isSaved + '">' + ic(isSaved ? 'bookmark-check' : 'bookmark') + '<span>' + (isSaved ? 'Saved' : u ? 'Save' : 'Sign in to save') + '</span></button>' + (src ? '<span class="gb-upd">Updated ' + esc(src.updated) + '</span>' : '') + '</div>'
+      /* sticky bar: guide list (mobile) + sections of this guide + reading progress */
+      + '<div class="gb-bar">'
+      + '<details class="gb-gd"><summary>' + ic('list') + '<span>' + esc(p.name) + ' guides</span>' + ic('chevron-down', 'gb-gdc') + '</summary><div class="gb-gdl" role="navigation" aria-label="' + esc(p.name) + ' guides"><p class="gb-gdt">' + (i + 1) + ' of ' + list.length + ' ' + esc(p.name) + ' guides</p>' + navList + '</div></details>'
+      + (numbered ? '<nav class="gb-sec" aria-label="In this guide"><span class="gb-l">In this guide</span>' + hs.map(function (b, k) { return '<a href="#' + slug(b[1]) + '"><i>' + (k + 1) + '</i>' + strip(b[1]) + '</a>'; }).join('') + '</nav>' : '<span class="gb-l gb-one">' + esc(topic ? topic.name : '') + '</span>')
+      + '<span class="gb-prog" aria-hidden="true"><i></i></span></div>'
+      + '<div class="art-body gb-body">' + a.body.map(block).join('') + '</div>'
       + (vid && vid.yt ? '<button type="button" class="art-vid" data-video="' + vid.id + '">' + shot(vThumb(vid)) + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video</span><b>' + esc(vid.title) + '</b></span></button>' : '')
-      + '<div class="fb" data-fb><b>Was this helpful?</b><div class="fb-b"><button type="button" class="btn sm ghost" data-v="yes">' + ic('thumbs-up') + 'Yes</button><button type="button" class="btn sm ghost" data-v="no">' + ic('thumbs-down') + 'No</button></div><p class="fb-ok" hidden></p></div>'
-      + '<nav class="pn" aria-label="Previous and next guide">' + (prev ? '<a class="pn-p" href="article.html?a=' + prev.id + '"><span class="pn-l">' + ic('chevron-left') + 'Previous</span><b>' + esc(prev.title) + '</b></a>' : '<span></span>') + (next ? '<a class="pn-n" href="article.html?a=' + next.id + '"><span class="pn-l">Next' + ic('chevron-right') + '</span><b>' + esc(next.title) + '</b></a>' : '') + '</nav>'
-      + '</article>'
-      + '<aside class="art-side">' + (function () { var hs = a.body.filter(function (b) { return b[0] === 'h'; }); return hs.length > 1 ? '<nav class="toc" aria-label="On this page"><b>On this page</b><ul>' + hs.map(function (b) { return '<li><a href="#' + slug(b[1]) + '">' + strip(b[1]) + '</a></li>'; }).join('') + '</ul></nav>' : ''; })() + '<div class="side-card"><b>Need a hand?</b><p>' + esc(H.support.reply) + '</p><a class="btn sm" href="contact.html?portal=' + p.id + '&topic=' + encodeURIComponent(a.title) + '">Contact support</a><a class="link sm" href="' + H.support.whatsapp + '" target="_blank" rel="noopener">' + ic('message-circle') + 'WhatsApp us</a></div>'
-      + (p.url ? '<a class="side-open" href="' + p.url + '" target="_blank" rel="noopener">' + ic('external-link') + 'Open ' + esc(p.name) + '<span>' + p.host + '</span></a>' : '')
-      + '</aside></div>'
+      + '<div class="ga-foot"><div class="ga-fb" data-fb><span>Was this helpful?</span><span class="fb-b"><button type="button" data-v="yes">' + ic('thumbs-up') + 'Yes</button><button type="button" data-v="no">' + ic('thumbs-down') + 'No</button></span><span class="fb-ok" hidden></span></div>'
+      + '<span class="ga-upd">' + (src ? 'From the ' + esc(src.doc) + ' · ' : '') + '<a href="contact.html?portal=' + p.id + '&topic=' + encodeURIComponent(a.title) + '">Still stuck? Contact support</a></span></div>'
+      + (next ? '<a class="gb-next" href="article.html?a=' + next.id + '"><span><em>Next guide · ' + (i + 2) + ' of ' + list.length + '</em><b>' + esc(next.title) + '</b></span>' + ic('arrow-right') + '</a>' : '<a class="gb-next" href="portal.html?p=' + p.id + '"><span><em>You’ve reached the last ' + esc(p.name) + ' guide</em><b>Back to ' + esc(p.name) + ' help</b></span>' + ic('arrow-right') + '</a>')
+      + (prev ? '<a class="gb-prev" href="article.html?a=' + prev.id + '">' + ic('arrow-left') + 'Previous: ' + esc(prev.title) + '</a>' : '')
+      + '</article></div>'
     );
     var sb = main.querySelector('[data-save]');
     sb.addEventListener('click', function () {
@@ -322,83 +460,183 @@
       var on = k < 0; sb.setAttribute('aria-pressed', on); sb.innerHTML = ic(on ? 'bookmark-check' : 'bookmark') + '<span>' + (on ? 'Saved' : 'Save') + '</span>'; icons();
     });
     main.querySelector('[data-copy]').addEventListener('click', function (e) {
-      var b = e.currentTarget, t = b.querySelector('span');
+      var t = e.currentTarget.querySelector('span');
       function done() { t.textContent = 'Copied'; setTimeout(function () { t.textContent = 'Copy link'; }, 1600); }
       if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, done); else done();
     });
     wireZoom();
-    /* highlight the section being read in "On this page" */
-    var toc = main.querySelectorAll('.toc a');
-    if (toc.length && 'IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (es) {
-        es.forEach(function (en) { if (en.isIntersecting) [].forEach.call(toc, function (l) { if (l.getAttribute('href') === '#' + en.target.id) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current'); }); });
-      }, { rootMargin: '-90px 0px -65% 0px' });
-      [].forEach.call(main.querySelectorAll('.art-body h2[id]'), function (h) { io.observe(h); });
+    /* sticky bar: highlight the current section, keep its chip in view, show reading progress */
+    var bar = main.querySelector('.gb-bar'), sec = main.querySelector('.gb-sec'), links = sec ? [].slice.call(sec.querySelectorAll('a')) : [], heads = [].slice.call(main.querySelectorAll('.gb-body h2[id]')), prog = main.querySelector('.gb-prog i'), art = main.querySelector('.gb-a');
+    function onScroll() {
+      var y = window.scrollY + 190, cur = 0;
+      heads.forEach(function (h, k) { if (h.getBoundingClientRect().top + window.scrollY <= y) cur = k; });
+      links.forEach(function (l, k) {
+        var on = k === cur; if (on) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current');
+        if (on && sec.scrollWidth > sec.clientWidth) { var x = l.offsetLeft - sec.offsetLeft; if (x < sec.scrollLeft || x + l.offsetWidth > sec.scrollLeft + sec.clientWidth) sec.scrollLeft = Math.max(0, x - 8); }
+      });
+      var r = art.getBoundingClientRect(), total = r.height - window.innerHeight * .6, done = Math.min(1, Math.max(0, -r.top / Math.max(total, 1)));
+      prog.style.width = (done * 100).toFixed(1) + '%';
+      bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= 66);
     }
+    window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+    /* the guide list closes when a section is chosen or the visitor taps outside it */
+    var gd = main.querySelector('.gb-gd');
+    document.addEventListener('click', function (e) { if (gd.open && !gd.contains(e.target)) gd.open = false; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && gd.open) { gd.open = false; gd.querySelector('summary').focus(); } });
     [].forEach.call(main.querySelectorAll('[data-fb] [data-v]'), function (b) {
       b.addEventListener('click', function () {
         var fb = store.get('pvh_feedback', {}); fb[a.id] = b.dataset.v; store.set('pvh_feedback', fb);
         var box = main.querySelector('[data-fb]'); box.querySelector('.fb-b').hidden = true; var ok = box.querySelector('.fb-ok'); ok.hidden = false;
-        ok.innerHTML = b.dataset.v === 'yes' ? 'Thanks. Glad it helped.' : 'Thanks for telling us. <a href="contact.html?portal=' + p.id + '&topic=' + encodeURIComponent(a.title) + '">Tell us what was missing</a> and we’ll improve this guide.';
+        ok.innerHTML = b.dataset.v === 'yes' ? 'Thanks, glad it helped.' : 'Thanks. <a href="contact.html?portal=' + p.id + '&topic=' + encodeURIComponent(a.title) + '">Tell us what was missing</a>.';
       });
     });
     wireVideos();
   };
 
   R.videos = function () {
-    title('Videos & demos');
-    var tabs = [{ id: 'all', name: 'All' }].concat(H.portals.filter(function (p) { return H.videos.some(function (v) { return v.p === p.id; }); }));
-    var start = (location.hash || '').slice(1); if (!tabs.some(function (t) { return t.id === start; })) start = 'all';
-    set(
-      '<section class="page-hero"><div class="wrap">' + crumbs([['Videos']]) + '<span class="eyebrow"><span class="dot"></span>' + (H.videos.some(function (v) { return v.yt; }) ? 'Demos' : 'Recordings in progress') + '</span><h1>Demo videos</h1><p class="lead">We’re recording a short demo for each task below. Until a video is up, its card opens the written guide, which has the same steps with screenshots.</p><div class="cta-row"><a class="btn" href="' + H.support.demo + '" target="_blank" rel="noopener">Book a live walkthrough instead ' + arrow() + '</a></div></div></section>'
-      + '<section class="sec"><div class="wrap"><div class="tabs-r" role="group" aria-label="Filter videos by portal">' + tabs.map(function (t) { return '<button type="button" data-tab="' + t.id + '" aria-pressed="' + (t.id === start) + '">' + esc(t.name) + '</button>'; }).join('') + '</div><div class="vgrid" id="vg"></div></div></section>'
-      + '<section class="sec tint"><div class="wrap"><div class="stack-s mb"><span class="eyebrow">Learning paths</span><h2>Each portal, in the order you’ll use it</h2></div><div class="pathgrid">'
-      + H.paths.map(function (pa) { var p = P(pa.p); return '<div class="path"><span class="tg">' + esc(p.name) + '</span><b>' + esc(pa.title) + '</b><ol>' + pa.steps.map(function (s, i) { var x = A(s); return '<li><a href="article.html?a=' + x.id + '"><i>' + String(i + 1).padStart(2, '0') + '</i>' + esc(x.title) + '</a></li>'; }).join('') + '</ol><a class="link" href="article.html?a=' + pa.steps[0] + '">Start path ' + arrow() + '</a></div>'; }).join('')
-      + '</div></div></section>' + helpBand()
-    );
-    function draw(id) {
-      document.getElementById('vg').innerHTML = H.videos.filter(function (v) { return id === 'all' || v.p === id; }).map(vidCard).join('');
-      [].forEach.call(main.querySelectorAll('[data-tab]'), function (b) { b.setAttribute('aria-pressed', b.dataset.tab === id); });
-      icons(); wireVideos();
+    title('Videos');
+    var all = H.videos, want = (location.hash || '').slice(1), filt = 'all';
+    var cur = all.filter(function (v) { return v.id === want; })[0];
+    if (!cur && P(want) && all.some(function (v) { return v.p === want; })) { filt = want; cur = all.filter(function (v) { return v.p === want; })[0]; }
+    if (!cur) cur = all[0];
+    var ps = H.portals.filter(function (p) { return all.some(function (v) { return v.p === p.id; }); });
+    var mob = window.matchMedia && matchMedia('(max-width: 900px)').matches;
+    function pn(v) { return v.p === 'all' ? 'All portals' : P(v.p).name; }
+    function list() { return all.filter(function (v) { return filt === 'all' || v.p === filt; }); }
+    set('<div class="vp-pg"><nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">Videos</span></nav>'
+      + '<h1 class="vp-h">Videos</h1>'
+      + '<div class="sr-chips vp-chips" role="group" aria-label="Filter videos by portal"><button type="button" data-f="all">All <em>' + all.length + '</em></button>' + ps.map(function (p) { var n = all.filter(function (v) { return v.p === p.id; }).length; return '<button type="button" data-f="' + p.id + '">' + esc(p.name) + ' <em>' + n + '</em></button>'; }).join('') + '</div>'
+      + '<div class="vp"><div class="vp-main" id="vp-main" tabindex="-1"></div>'
+      + '<details class="vp-list" id="vp-list"' + (mob ? '' : ' open') + '><summary><span id="vp-sum"></span>' + ic('chevron-down', 'vp-c') + '</summary><ol id="vp-ol"></ol></details></div></div>');
+    function drawMain(focus) {
+      var v = cur, a = A(v.article), t = vThumb(v), L = list(), i = L.indexOf(v), nx = L[i + 1];
+      var secs = a ? a.body.filter(function (x) { return x[0] === 'h'; }).map(function (x) { return x[1]; }) : [];
+      var poster = '<div class="vp-play">' + (t ? '<img src="' + t + '" alt="">' : '<span class="vp-blank">' + ic(v.p === 'all' ? 'layers' : P(v.p).icon) + '</span>')
+        + (v.yt ? '<button type="button" class="vp-btn" id="vp-go" aria-label="Play: ' + esc(v.title) + '">' + ic('play') + '</button>'
+                : '<div class="vp-soon"><b>Video coming soon</b><span>The written guide has the same steps, with screenshots.</span>' + (a ? '<a class="btn" href="article.html?a=' + a.id + '">Read the guide ' + arrow() + '</a>' : '') + '</div>') + '</div>';
+      document.getElementById('vp-main').innerHTML = poster
+        + '<h2 class="vp-t">' + esc(v.title) + '</h2><p class="vp-m">' + esc(pn(v)) + (i > -1 ? ' · ' + (i + 1) + ' of ' + L.length : '') + (a ? ' · <a href="article.html?a=' + a.id + '">Read the guide</a>' : '') + '</p>'
+        + (secs.length ? '<div class="vp-in"><b>' + (v.yt ? 'In this video' : 'What it will cover') + '</b><ol>' + secs.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ol></div>' : (a ? '<p class="vp-m">' + esc(a.sum) + '</p>' : ''))
+        + '<div class="vp-nav">' + (nx ? '<button type="button" class="btn ghost" data-v="' + nx.id + '">Next video: ' + esc(nx.title) + ' ' + arrow() + '</button>' : '') + '</div>';
+      var go = document.getElementById('vp-go');
+      if (go) go.addEventListener('click', function () { var box = go.parentNode; box.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(v.yt) + '?autoplay=1&rel=0" title="' + esc(v.title) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'; });
+      wireV(document.getElementById('vp-main')); icons();
+      if (focus) { var m = document.getElementById('vp-main'); m.focus({ preventScroll: true }); m.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' }); }
     }
-    [].forEach.call(main.querySelectorAll('[data-tab]'), function (b) { b.addEventListener('click', function () { history.replaceState(null, '', b.dataset.tab === 'all' ? 'videos.html' : '#' + b.dataset.tab); draw(b.dataset.tab); }); });
-    draw(start);
+    function drawList() {
+      var L = list(), i = L.indexOf(cur);
+      document.getElementById('vp-sum').textContent = 'All videos · ' + (i > -1 ? (i + 1) + ' of ' + L.length : L.length);
+      document.getElementById('vp-ol').innerHTML = L.map(function (v, k) { return '<li><button type="button" data-v="' + v.id + '"' + (v === cur ? ' aria-current="true"' : '') + '><span class="vp-n">' + (k + 1) + '</span><span><b>' + esc(v.title) + '</b><span>' + esc(pn(v)) + (v.yt ? '' : ' · Coming soon') + '</span></span></button></li>'; }).join('');
+      wireV(document.getElementById('vp-ol'));
+      [].forEach.call(main.querySelectorAll('[data-f]'), function (b) { b.setAttribute('aria-pressed', b.dataset.f === filt); });
+    }
+    function pick(id) {
+      cur = all.filter(function (v) { return v.id === id; })[0] || cur;
+      history.replaceState(null, '', 'videos.html#' + cur.id);
+      if (mob) document.getElementById('vp-list').open = false;
+      drawList(); drawMain(true);
+    }
+    function wireV(el) { [].forEach.call(el.querySelectorAll('[data-v]'), function (b) { b.addEventListener('click', function () { pick(b.dataset.v); }); }); }
+    [].forEach.call(main.querySelectorAll('[data-f]'), function (b) { b.addEventListener('click', function () {
+      filt = b.dataset.f; var L = list(); if (L.indexOf(cur) < 0) cur = L[0];
+      history.replaceState(null, '', 'videos.html#' + (filt === 'all' ? cur.id : filt));
+      drawList(); drawMain(false);
+    }); });
+    var det = document.getElementById('vp-list');
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && mob && det.open) { det.open = false; det.querySelector('summary').focus(); } });
+    window.addEventListener('hashchange', function () { var h = location.hash.slice(1); if (h !== cur.id && all.some(function (v) { return v.id === h; })) { cur = all.filter(function (v) { return v.id === h; })[0]; if (list().indexOf(cur) < 0) filt = 'all'; drawList(); drawMain(false); } });
+    drawList(); drawMain(false);
+  };
+
+  R.guides = function () {
+    title('All guides');
+    var order = ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'apps', 'account'];
+    var ps = order.map(P).filter(function (p) { return p && inPortal(p.id).length; });
+    function pick() { var h = (location.hash || '').slice(1); return ps.some(function (p) { return p.id === h; }) ? h : 'studio'; }
+    var cur = pick();
+    set('<div class="gx">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">Guides</span></nav>'
+      + '<div><h1>All guides</h1><p class="ct-lead">' + H.articles.length + ' step-by-step guides. Pick a portal.</p></div>'
+      + searchBox({ ph: 'Search all guides' })
+      + '<div class="gx-chips" role="group" aria-label="Portals" translate="no">' + ps.map(function (p) { return '<a href="#' + p.id + '" data-p="' + p.id + '">' + esc(p.name) + ' <em>' + inPortal(p.id).length + '</em></a>'; }).join('') + '</div>'
+      + '<div class="gx-g"><nav class="gx-rail" aria-label="Portals"><h2>Portals</h2>' + ps.map(function (p) { return '<a href="#' + p.id + '" data-p="' + p.id + '"><span translate="no">' + esc(p.name) + '</span><em>' + inPortal(p.id).length + '</em></a>'; }).join('') + '</nav>'
+      + '<section class="gx-main" id="gx-main" tabindex="-1" aria-live="polite"></section></div></div>');
+    function draw(focus) {
+      var p = P(cur), arts = inPortal(p.id);
+      [].forEach.call(main.querySelectorAll('[data-p]'), function (a) { if (a.dataset.p === cur) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+      var on = main.querySelector('.gx-chips [aria-current]'); if (on && on.scrollIntoView && window.innerWidth <= 800) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      var m = document.getElementById('gx-main');
+      m.innerHTML = '<div class="gx-h"><span class="ptl-ic sm">' + ic(p.icon) + '</span><div><h2 translate="no">' + esc(p.name) + '</h2><p>' + esc(p.who) + '</p></div><a href="portal.html?p=' + p.id + '">Open ' + esc(p.name) + ' help ' + arrow() + '</a></div>'
+        + p.topics.map(function (t) { var l = arts.filter(function (a) { return a.t === t.id; }); if (!l.length) return ''; return '<div class="gx-t"><h3>' + esc(t.name) + '</h3><ul>' + l.map(function (a) { return '<li><a href="article.html?a=' + a.id + '"><b>' + esc(a.title) + '</b><span>' + esc(a.sum) + '</span></a></li>'; }).join('') + '</ul></div>'; }).join('')
+        + '<div class="sr-stuck"><div><b>Can’t find your guide?</b><span>' + esc(H.support.reply) + '</span></div><a class="btn" href="contact.html?portal=' + p.id + '">Contact support</a></div>';
+      icons();
+      if (focus) { m.focus({ preventScroll: true }); var top = m.getBoundingClientRect().top + window.scrollY - 90; if (window.scrollY > top) window.scrollTo({ top: top, behavior: reduce ? 'auto' : 'smooth' }); }
+    }
+    [].forEach.call(main.querySelectorAll('[data-p]'), function (a) { a.addEventListener('click', function (e) { e.preventDefault(); cur = a.dataset.p; history.replaceState(null, '', 'guides.html#' + cur); draw(true); }); });
+    window.addEventListener('hashchange', function () { var n = pick(); if (n !== cur) { cur = n; draw(false); } });
+    draw(false); wireSuggest();
   };
 
   R.search = function () {
-    var q = qs('q') || '', pid = qs('p') || 'all', r = search(q, pid);
+    var q = (qs('q') || '').trim(), pid = qs('p') || 'all', all = search(q, 'all').a;
     title(q ? 'Results for “' + q + '”' : 'Search');
-    var n = r.a.length + r.v.length;
-    set(
-      '<section class="page-hero tight-hero"><div class="wrap">' + crumbs([['Search']]) + '<h1>' + (q ? 'Results for “' + esc(q) + '”' : 'Search help') + '</h1>' + searchBox({ q: q, p: pid, select: true }) + '</div></section>'
-      + '<section class="sec"><div class="wrap narrow-w">'
-      + (q ? '<p class="muted mb">' + n + ' result' + (n === 1 ? '' : 's') + (pid !== 'all' ? ' in ' + esc(P(pid).name) + ' · <a href="search.html?q=' + encodeURIComponent(q) + '">search all portals</a>' : '') + '</p>' : '')
-      + (r.a.length ? '<h2 class="h3x mb">Guides</h2><div class="alist">' + r.a.map(function (a) { return artRow(a, true); }).join('') + '</div>' : '')
-      + (r.v.length ? '<h2 class="h3x mb mt2">Videos</h2><div class="vgrid">' + r.v.map(vidCard).join('') + '</div>' : '')
-      + (q && !n ? '<div class="empty">' + ic('search-x') + '<h2>No guides match that yet.</h2><p>Try fewer words, or one of these. You can also ask us directly.</p><div class="chips">' + H.popular.slice(0, 4).map(function (id) { var x = A(id); return '<a class="chip" href="article.html?a=' + id + '">' + esc(x.title) + '</a>'; }).join('') + '</div><a class="btn" href="contact.html?topic=' + encodeURIComponent(q) + '">Ask support</a></div>' : '')
-      + (!q ? '<h2 class="h3x mb">Start with these</h2><div class="alist">' + H.popular.map(function (id) { return artRow(A(id), true); }).join('') + '</div>' : '')
-      + '</div></section>' + helpBand()
-    );
-    wireSuggest(); wireVideos();
+    var words = q.toLowerCase().split(/\s+/).filter(function (w) { return w.length > 1; });
+    function hl(t) {
+      t = esc(t); if (!words.length) return t;
+      var re = new RegExp('\\b(' + words.map(function (w) { return esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'gi');
+      return t.replace(re, '<mark>$1</mark>');
+    }
+    function row(a) {
+      var p = P(a.p), t = (p.topics || []).filter(function (x) { return x.id === a.t; })[0];
+      return '<li><a class="sr-r" href="article.html?a=' + a.id + '"><span class="sr-tag">' + esc(p.name) + (t ? '<i> · ' + esc(t.name) + '</i>' : '') + '</span><b>' + hl(a.title) + '</b><span class="sr-sum">' + hl(a.sum) + '</span></a></li>';
+    }
+    var counts = {}; all.forEach(function (a) { counts[a.p] = (counts[a.p] || 0) + 1; });
+    var ps = H.portals.filter(function (p) { return counts[p.id]; }).sort(function (m, n) { return counts[n.id] - counts[m.id]; });
+    if (pid !== 'all' && !counts[pid]) pid = 'all';
+    var stuck = '<div class="sr-stuck"><div><b>' + (q ? 'Didn’t find it?' : 'Can’t find what you need?') + '</b><span>' + (q ? 'Tell us what you searched for. ' : '') + esc(H.support.reply) + '</span></div><a class="btn" href="contact.html' + (q ? '?topic=' + encodeURIComponent(q) : '') + '">' + (q ? 'Ask support about “' + esc(q) + '”' : 'Contact support') + '</a></div>';
+    var body;
+    if (!q) body = '<h1 class="sr-h">Search help</h1><h2 class="sr-sub">Popular guides</h2><ul class="sr-list">' + H.popular.map(function (id) { return row(A(id)); }).join('') + '</ul>';
+    else if (!all.length) body = '<div class="sr-none" role="status"><h1 class="sr-h">No guides match “' + esc(q) + '”</h1><p>Try fewer or simpler words, like “BOQ” or “payment”. Or start with a popular guide.</p></div><ul class="sr-list">' + H.popular.slice(0, 4).map(function (id) { return row(A(id)); }).join('') + '</ul>';
+    else body = '<h1 class="sr">Results for “' + esc(q) + '”</h1>'
+      + (ps.length > 1 ? '<div class="sr-chips" role="group" aria-label="Filter by portal"><button type="button" data-f="all">All <em>' + all.length + '</em></button>' + ps.map(function (p) { return '<button type="button" data-f="' + p.id + '">' + esc(p.name) + ' <em>' + counts[p.id] + '</em></button>'; }).join('') + '</div>' : '')
+      + '<p class="sr-n" id="sr-n" role="status"></p><ul class="sr-list" id="sr-l"></ul>';
+    set('<div class="ptl sr-pg"><nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">Search</span></nav>'
+      + searchBox({ q: q, ph: 'Search all pvNXT help' }) + body + stuck + '</div>');
+    function draw(f) {
+      pid = f; var r = all.filter(function (a) { return f === 'all' || a.p === f; });
+      var l = document.getElementById('sr-l'), more = r.length > 10;
+      l.innerHTML = r.slice(0, 10).map(row).join('') + (more ? '<li class="sr-more-li"><button type="button" class="sr-more">Show ' + (r.length - 10) + ' more</button></li>' : '');
+      if (more) l.querySelector('.sr-more').addEventListener('click', function () { var li = this.parentNode, i = 10; li.outerHTML = r.slice(10).map(row).join(''); var nx = l.children[i] && l.children[i].querySelector('a'); if (nx) nx.focus(); });
+      document.getElementById('sr-n').textContent = r.length + (r.length === 1 ? ' guide' : ' guides') + ' for “' + q + '”' + (f === 'all' ? '' : ' in ' + P(f).name);
+      [].forEach.call(main.querySelectorAll('[data-f]'), function (b) { b.setAttribute('aria-pressed', b.dataset.f === f); });
+    }
+    if (q && all.length) {
+      [].forEach.call(main.querySelectorAll('[data-f]'), function (b) { b.addEventListener('click', function () { draw(b.dataset.f); history.replaceState(null, '', 'search.html?q=' + encodeURIComponent(q) + (b.dataset.f === 'all' ? '' : '&p=' + b.dataset.f)); }); });
+      draw(pid);
+    }
+    wireSuggest();
   };
 
   R.contact = function () {
     title('Contact support'); var u = user(), pre = qs('portal') || '', topic = qs('topic') || '';
+    function ch(href, icon, t, sub, ext, cls) { return '<a class="ct-ch' + (cls ? ' ' + cls : '') + '" href="' + href + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '><span class="ct-i">' + ic(icon) + '</span><span><b>' + t + '</b><span>' + sub + '</span></span></a>'; }
     set(
-      '<section class="page-hero"><div class="wrap">' + crumbs([['Contact']]) + '<span class="eyebrow"><span class="dot"></span>' + esc(H.support.hours) + '</span><h1>Talk to the pvNXT team.</h1><p class="lead">Tell us what happened. ' + esc(H.support.reply) + '</p></div></section>'
-      + '<section class="sec"><div class="wrap contact-g">'
-      + '<div class="fcard"><form id="rq" novalidate><h2 class="h3x">Raise a request</h2>'
-      + '<div class="two"><label>Name<input name="name" required autocomplete="name" value="' + esc(u ? u.name || '' : '') + '"></label><label>Work email<input name="email" type="email" required autocomplete="email" value="' + esc(u ? u.email : '') + '"></label></div>'
+      '<div class="ptl ct">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">Contact</span></nav>'
+      + '<div><h1>Contact support</h1><p class="ct-lead">Tell us what happened. ' + esc(H.support.reply) + '</p></div>'
+      + '<div class="ct-g"><div class="ct-f"><form id="rq" novalidate>'
+      + '<div class="two"><label>Name<input name="name" required autocomplete="name" value="' + esc(u ? u.name || '' : '') + '"></label><label>Email<input name="email" type="email" required autocomplete="email" value="' + esc(u ? u.email : '') + '"></label></div>'
       + '<div class="two"><label>Portal<select name="portal" required><option value="">Choose a portal</option>' + H.portals.map(function (p) { return '<option value="' + p.id + '"' + (pre === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label><label>Topic<input name="topic" required placeholder="e.g. BOQ not updating" value="' + esc(topic) + '"></label></div>'
-      + '<div class="hint-arts" id="ha" hidden></div>'
+      + '<div class="hint-arts" id="ha" hidden aria-live="polite"></div>'
       + '<label>What happened?<textarea name="msg" rows="5" required placeholder="What you did, what you expected, what you saw. Include the project or plant name if you have one."></textarea></label>'
-      + '<p class="ferr" id="ferr" role="alert" hidden></p><div class="cta-row"><button class="btn" type="submit">Send request ' + arrow() + '</button><span class="note">Sends through your email app to ' + H.support.email + '.</span></div></form>'
-      + '<div class="ok" id="ok">' + ic('circle-check') + '<h3>Your request is ready to send.</h3><p class="muted">Your email app opened with the details filled in. Press send and we’ll reply within one working day.</p><p class="muted" id="ok-mail"></p><div class="cta-row"><a class="btn" href="' + (u ? 'my.html#requests' : 'index.html') + '">' + (u ? 'View my requests' : 'Back to help') + '</a><button type="button" class="link" id="again">Raise another</button></div></div></div>'
-      + '<aside class="stack"><a class="ccard row" href="mailto:' + H.support.email + '">' + ic('mail') + '<span><b>Email</b><span>' + H.support.email + '</span></span></a>'
-      + '<a class="ccard row" href="' + H.support.whatsapp + '" target="_blank" rel="noopener">' + ic('message-circle') + '<span><b>WhatsApp</b><span>' + esc(H.support.hours) + '</span></span></a>'
-      + '<a class="ccard row" href="' + H.support.demo + '" target="_blank" rel="noopener">' + ic('calendar') + '<span><b>Book a live demo</b><span>A walkthrough for your team</span></span></a>'
-      + '<a class="ccard row" href="status.html">' + ic('activity') + '<span><b>Portal status</b><span>Check before you write</span></span></a></aside>'
-      + '</div></section>'
+      + '<p class="ferr" id="ferr" role="alert" hidden></p><div class="ct-send"><button class="btn" type="submit">Send request ' + arrow() + '</button><span class="note">Opens your email app, addressed to ' + H.support.email + '.</span></div></form>'
+      + '<div class="ok" id="ok" tabindex="-1">' + ic('circle-check') + '<h2>Your request is ready to send.</h2><p class="muted">Your email app opened with the details filled in. Press send and we’ll reply within one working day.</p><p class="muted" id="ok-mail"></p><div class="ct-send"><a class="btn" href="' + (u ? 'my.html#requests' : 'index.html') + '">' + (u ? 'View my requests' : 'Back to help') + '</a><button type="button" class="link" id="again">Raise another</button></div></div></div>'
+      + '<aside class="ct-side" aria-labelledby="ct-or"><h2 id="ct-or">Or reach us directly</h2>'
+      + ch(H.support.whatsapp, 'message-circle', 'WhatsApp', esc(H.support.hours), true)
+      + ch('mailto:' + H.support.email, 'mail', 'Email', H.support.email)
+      + ch('status.html', 'activity', 'Portal status', 'Check before you write', false, 'ct-x')
+      + ch(H.support.demo, 'calendar', 'Book a live demo', 'A walkthrough for your team', true, 'ct-x')
+      + '</aside></div></div>'
     );
     var f = document.getElementById('rq'), ha = document.getElementById('ha');
     function hints() {
@@ -425,112 +663,162 @@
   };
 
   R.status = function () {
-    title('Portal status'); var s = H.status;
+    title('Portal status'); var s = H.status, keys = Object.keys(s.items);
     var lab = { ok: ['No issues reported', 'ok'], issue: ['Investigating an issue', 'issue'], soon: ['Early access', 'soon'] };
-    set(
-      '<section class="page-hero"><div class="wrap">' + crumbs([['Status']]) + '<span class="eyebrow"><span class="dot"></span>Updated ' + esc(s.updated) + '</span><h1>Portal status</h1><p class="lead">Can’t reach a portal? Check here first. If yours shows no issues, tell us and we’ll look into it.</p></div></section>'
-      + '<section class="sec"><div class="wrap narrow-w"><div class="slist">' + Object.keys(s.items).map(function (k) {
-        var p = P(k), l = lab[s.items[k]] || lab.ok;
-        return '<div class="srow"><span class="sname">' + ic(p.icon) + '<span><b>' + esc(p.name) + '</b><span class="host">' + (p.host || '') + '</span></span></span><span class="sdot ' + l[1] + '">' + esc(l[0]) + '</span><span class="sact">' + (p.url && k !== 'artha' ? '<a class="link sm" href="' + p.url + '" target="_blank" rel="noopener">Open</a>' : '') + '<a class="link sm" href="contact.html?portal=' + k + '&topic=' + encodeURIComponent('Can’t reach ' + p.name) + '">Report a problem</a></span></div>';
-      }).join('') + '</div><p class="note mt">Atlas runs inside Studio and Connect, so it shares their status. This page is updated by the pvNXT support team.</p></div></section>' + helpBand()
-    );
+    var bad = keys.filter(function (k) { return s.items[k] === 'issue'; });
+    var ban = bad.length
+      ? '<div class="st-ban issue" role="status"><span class="st-bi">' + ic('alert-triangle') + '</span><div><b>' + esc(names(bad.map(P))) + (bad.length === 1 ? ' has' : ' have') + ' an issue</b><span>We’re looking into it. Updated ' + esc(s.updated) + ' by the pvNXT support team.</span></div></div>'
+      : '<div class="st-ban" role="status"><span class="st-bi">' + ic('check') + '</span><div><b>All portals are working</b><span>Updated ' + esc(s.updated) + ' by the pvNXT support team</span></div></div>';
+    set('<div class="ptl st">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">Status</span></nav>'
+      + '<div><h1>Portal status</h1><p class="ct-lead">Can’t reach a portal? Check here first.</p></div>' + ban
+      + '<ul class="st-list">' + keys.map(function (k) {
+          var p = P(k), l = lab[s.items[k]] || lab.ok;
+          return '<li><div class="st-n"><b>' + esc(p.name) + '</b>' + (p.host ? '<span>' + esc(p.host) + '</span>' : '') + '</div><span class="st-s ' + l[1] + '">' + esc(l[0]) + '</span><div class="st-a">'
+            + (p.url && s.items[k] !== 'soon' ? '<a href="' + p.url + '" target="_blank" rel="noopener">Open<span class="sr"> ' + esc(p.name) + ' (opens in a new tab)</span></a>' : '')
+            + '<a href="contact.html?portal=' + k + '&topic=' + encodeURIComponent('Can’t reach ' + p.name) + '">Report a problem<span class="sr"> with ' + esc(p.name) + '</span></a></div></li>';
+        }).join('') + '</ul>'
+      + '<p class="st-foot">Atlas runs inside Studio and Connect, so it shares their status. Something isn’t working but shows no issue here? <a href="contact.html?topic=' + encodeURIComponent('Portal not working') + '">Tell us</a>.</p></div>');
   };
+
 
   R.signin = function () {
     title('Sign in'); var next = qs('next') || 'my.html';
     if (!/^[a-z0-9-]+\.html(\?[^#]*)?(#.*)?$/i.test(next)) next = 'my.html';
     if (user()) { location.replace(next); return; }
-    var choose = ['studio', 'go', 'connect', 'scada'];
-    set(
-      '<section class="sec signin"><div class="wrap signin-g"><div class="fcard"><span class="eyebrow">pvNXT Help</span><h1 class="h2x">Sign in to your help workspace</h1><p class="muted">Use the email you use for your pvNXT portal.</p>'
-      + '<form id="si" novalidate><label>Work email<input name="email" type="email" required autocomplete="email"></label><label>Your name<input name="name" autocomplete="name"></label>'
-      + '<fieldset class="pchk"><legend>Which portals do you use?</legend>' + choose.map(function (id) { var p = P(id); return '<label class="chk"><input type="checkbox" name="pt" value="' + id + '"><span>' + ic(p.icon) + esc(p.name) + '</span></label>'; }).join('') + '</fieldset>'
-      + '<p class="ferr" id="serr" role="alert" hidden></p><button class="btn wide" type="submit">Continue ' + arrow() + '</button></form>'
-      + '<div class="demo-note">' + ic('info') + '<span><b>Demo sign-in.</b> No password is checked yet. Single sign-on with your pvNXT account is coming next.</span></div></div>'
-      + '<div class="signin-side"><div class="signin-q"><b>Signed in, you get:</b><ul><li>' + ic('inbox') + 'Your support requests in one place</li><li>' + ic('bookmark') + 'Saved guides</li><li>' + ic('graduation-cap') + 'Learning paths with progress</li><li>' + ic('layout-dashboard') + 'Help for the portals you use</li></ul><a class="link" href="index.html">Or keep browsing as a guest ' + arrow() + '</a></div></div></div></section>'
-    );
-    document.getElementById('si').addEventListener('submit', function (e) {
-      e.preventDefault(); var f = e.target, em = f.email.value.trim(), err = document.getElementById('serr');
-      if (!/\S+@\S+\.\S+/.test(em)) { err.textContent = 'Enter a valid email address.'; err.hidden = false; f.email.setAttribute('aria-invalid', 'true'); f.email.focus(); return; }
-      var pts = [].slice.call(f.querySelectorAll('[name=pt]:checked')).map(function (x) { return x.value; });
-      store.set('pvh_user', { email: em, name: f.name.value.trim(), portals: pts.length ? pts : ['studio'] });
-      location.href = next;
-    });
+    var acct = ['studio', 'go', 'connect', 'scada'];
+    /* Demo only: the real portal comes from the pvNXT account system. */
+    var demo = { 'studio@demo.pvnxt.com': 'studio', 'go@demo.pvnxt.com': 'go', 'connect@demo.pvnxt.com': 'connect', 'scada@demo.pvnxt.com': 'scada' };
+    var em = '', pid = '', mode = 'pw';
+    var sso = ['Google', 'Microsoft', 'Apple'].map(function (n) { return '<button type="button" class="si-sso" data-sso="' + n + '">Continue with ' + n + '</button>'; }).join('');
+    set('<div class="si-pg"><div class="si-card" id="si-card"></div><p class="si-demo">' + ic('info') + '<span><b>Demo sign-in.</b> Passwords and codes aren’t checked yet. Real sign-in will use your pvNXT portal account.</span></p></div>');
+    var card = document.getElementById('si-card');
+    function step1(msg) {
+      card.innerHTML = '<h1>Sign in to pvNXT Help</h1><p class="si-sub">Use the account you already have on Studio, Go, Connect or SCADA.</p>'
+        + '<div class="si-ssos">' + sso + '</div><p class="si-note" id="si-sn" role="status" hidden></p><div class="si-or"><span>or</span></div>'
+        + '<form id="si1" novalidate><label>Email<input name="email" type="email" required autocomplete="email" inputmode="email" value="' + esc(em) + '"></label>'
+        + '<p class="ferr" id="serr" role="alert"' + (msg ? '' : ' hidden') + '>' + (msg || '') + '</p><button class="btn si-full" type="submit">Continue ' + arrow() + '</button></form>'
+        + '<p class="si-new">New to pvNXT? Accounts are created in your portal. <a href="article.html?a=which-portal">Which portal is mine?</a></p>';
+      icons();
+      [].forEach.call(card.querySelectorAll('[data-sso]'), function (b) { b.addEventListener('click', function () { var n = document.getElementById('si-sn'); n.textContent = b.dataset.sso + ' sign-in will work once help is connected to pvNXT accounts. For this demo, use your email.'; n.hidden = false; card.querySelector('[name=email]').focus(); }); });
+      var f = document.getElementById('si1');
+      f.addEventListener('submit', function (e) {
+        e.preventDefault(); var v = f.email.value.trim().toLowerCase(), err = document.getElementById('serr');
+        if (!/^\S+@\S+\.\S+$/.test(v)) { err.textContent = 'Enter the email you use for your pvNXT portal.'; err.hidden = false; f.email.setAttribute('aria-invalid', 'true'); f.email.focus(); return; }
+        em = v; pid = demo[v] || ''; step2();
+      });
+      if (!msg) f.email.focus();
+    }
+    function step2() {
+      var p = pid ? P(pid) : null;
+      card.innerHTML = '<h1>Welcome back</h1>'
+        + '<div class="si-who"><span><b>' + esc(em) + '</b><span>' + (p ? esc(p.name) + ' account' : 'pvNXT account') + '</span></span><button type="button" class="link" id="si-ch">Change</button></div>'
+        + '<form id="si2" novalidate>'
+        + (p ? '' : '<label>Demo only: which portal is this account on?<select name="pid" required><option value="">Choose your portal</option>' + acct.map(function (id) { return '<option value="' + id + '">' + esc(P(id).name) + '</option>'; }).join('') + '</select><span class="si-hint">On the live site we’ll find this from your email.</span></label>')
+        + (mode === 'pw'
+          ? '<label>Password<input name="pw" type="password" required autocomplete="current-password"></label>'
+          : '<label>6-digit code<input name="pw" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"><span class="si-hint">We sent a code to ' + esc(em) + '. (Demo: enter any 6 digits.)</span></label>')
+        + '<p class="ferr" id="serr" role="alert" hidden></p><button class="btn si-full" type="submit">Sign in</button></form>'
+        + '<div class="si-links"><button type="button" class="link" id="si-mode">' + (mode === 'pw' ? 'Email me a code instead' : 'Use my password instead') + '</button>'
+        + (mode === 'pw' ? '<a href="' + (p && p.url ? p.url : 'contact.html?topic=' + encodeURIComponent('Forgot password')) + '"' + (p && p.url ? ' target="_blank" rel="noopener"' : '') + '>Forgot password?</a>' : '') + '</div>'
+        + '<p class="si-new">Guides are open to everyone. <a href="index.html">Continue as a guest</a></p>';
+      document.getElementById('si-ch').addEventListener('click', function () { step1(); });
+      document.getElementById('si-mode').addEventListener('click', function () { mode = mode === 'pw' ? 'code' : 'pw'; step2(); });
+      var f = document.getElementById('si2');
+      f.addEventListener('submit', function (e) {
+        e.preventDefault(); var err = document.getElementById('serr'), bad = null;
+        if (f.pid && !f.pid.value) bad = [f.pid, 'Choose the portal for this account.'];
+        else if (mode === 'pw' && !f.pw.value) bad = [f.pw, 'Enter your password.'];
+        else if (mode === 'code' && !/^\d{6}$/.test(f.pw.value.trim())) bad = [f.pw, 'Enter the 6-digit code.'];
+        if (bad) { err.textContent = bad[1]; err.hidden = false; bad[0].setAttribute('aria-invalid', 'true'); bad[0].focus(); return; }
+        var portal = pid || f.pid.value;
+        store.set('pvh_user', { email: em, name: '', portals: [portal] });
+        location.href = next;
+      });
+      (f.pid || f.pw).focus();
+    }
+    step1();
   };
 
   R.my = function () {
     var u = user(); if (!u) { location.replace('signin.html?next=my.html'); return; }
     title('My help');
-    var views = ['overview', 'requests', 'saved', 'learning'];
-    var mine = u.portals.map(P).filter(Boolean);
-    set(
-      '<div class="ws"><aside class="ws-side" aria-label="My help"><span class="sh">My help</span>'
-      + '<a href="#overview" data-v="overview">' + ic('layout-dashboard') + 'Overview</a><a href="#requests" data-v="requests">' + ic('inbox') + 'My requests</a><a href="#saved" data-v="saved">' + ic('bookmark') + 'Saved guides</a><a href="#learning" data-v="learning">' + ic('graduation-cap') + 'Learning paths</a>'
-      + '<span class="sh">Your portals</span>' + mine.map(function (p) { return '<a href="portal.html?p=' + p.id + '">' + ic(p.icon) + esc(p.name) + (p.host ? '<span class="sm-host">' + p.host.split('.')[0] + '</span>' : '') + '</a>'; }).join('')
-      + '<a href="portal.html?p=account">' + ic('shield-check') + 'Account &amp; security</a>'
-      + '<div class="ws-promo"><b>Book a live walkthrough</b><span>The pvNXT team shows your crew the portals you use.</span><a class="btn sm" href="' + H.support.demo + '" target="_blank" rel="noopener">Pick a slot</a></div></aside>'
-      + '<div class="ws-main"><div class="ws-top"><div><b>Welcome back' + (u.name ? ', ' + esc(u.name.split(' ')[0]) : '') + '</b><span>Signed in as ' + esc(u.email) + ' · ' + mine.map(function (p) { return esc(p.name); }).join(', ') + '</span></div>'
-      + mine.filter(function (p) { return p.url; }).slice(0, 2).map(function (p) { return '<a class="btn sm ghost" href="' + p.url + '" target="_blank" rel="noopener">Open ' + esc(p.name) + ' ' + ic('external-link') + '</a>'; }).join('') + '</div>'
-      + '<div class="ws-body" id="wsb"></div></div></div>'
-    );
-    function view(v) {
-      if (views.indexOf(v) < 0) v = 'overview';
-      [].forEach.call(main.querySelectorAll('[data-v]'), function (a) { if (a.dataset.v === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-      document.getElementById('wsb').innerHTML = W[v](); icons(); wireSuggest(); wireVideos();
-      if (v === 'requests') wireReq();
-    }
+    var p = P((u.portals || [])[0]) || P('studio'), read = store.get('pvh_read', []);
     function reqs() { return store.get('pvh_requests', []); }
-    function reqCard(r) { var p = P(r.portal); return '<div class="rq"><div class="rq-h"><b>' + esc(r.topic) + '</b><span class="badge ' + (r.status === 'Resolved' ? 'done' : 'wait') + '">' + esc(r.status) + '</span></div><span class="rq-m">' + esc(p ? p.name : '') + ' · ' + r.id + ' · ' + new Date(r.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span><p>' + esc(r.msg.length > 160 ? r.msg.slice(0, 160) + '…' : r.msg) + '</p></div>'; }
-    function progress(pa) { var read = store.get('pvh_read', []); var d = pa.steps.filter(function (s) { return read.indexOf(s) > -1; }).length; return { d: d, n: pa.steps.length, next: pa.steps.filter(function (s) { return read.indexOf(s) < 0; })[0] }; }
-    function pathCard(pa, compact) {
-      var g = progress(pa), pc = Math.round(g.d / g.n * 100), p = P(pa.p);
-      return '<div class="pcard"><div class="pcard-h">' + (p.shot ? shot(p.shot, 'pthumb', '') : '<span class="pthumb picon">' + ic(p.icon) + '</span>') + '<div class="grow"><b>' + esc(pa.title) + '</b><span class="bar" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + esc(pa.title) + ' progress"><span style="width:' + pc + '%"></span></span><span class="mono">' + g.d + ' of ' + g.n + ' guides read</span></div></div>'
-        + (compact ? '' : '<ol class="psteps">' + pa.steps.map(function (s) { var x = A(s), done = store.get('pvh_read', []).indexOf(s) > -1; return '<li class="' + (done ? 'done' : '') + '"><a href="article.html?a=' + s + '">' + ic(done ? 'circle-check' : 'circle') + esc(x.title) + '</a></li>'; }).join('') + '</ol>')
-        + (g.next ? '<a class="link sm" href="article.html?a=' + g.next + '">' + (g.d ? 'Continue' : 'Start') + ' ' + arrow() + '</a>' : '<span class="mono ok-t">' + ic('circle-check') + 'Complete</span>') + '</div>';
-    }
-    var W = {
-      overview: function () {
-        var first = mine[0], rs = reqs(), rec = store.get('pvh_recent', []).map(A).filter(Boolean).slice(0, 4);
-        var myPaths = H.paths.filter(function (pa) { return u.portals.indexOf(pa.p) > -1; });
-        var faqs = H.articles.filter(function (a) { return u.portals.indexOf(a.p) > -1; }).slice(0, 5);
-        return '<div class="ws-hero"><h1>Help for ' + esc(names(mine)) + '</h1><p>Guides for the portals you use, and where your support requests stand.</p>' + searchBox({ ph: 'Ask a question about ' + mine.map(function (p) { return p.name; }).join(', '), p: mine.length === 1 ? first.id : '' }) + '</div>'
-          + '<div class="cards3"><a class="wcard" href="portal.html?p=' + first.id + '"><span class="wic">' + ic('graduation-cap') + '</span><b>Getting started in ' + esc(first.name) + '</b><span>' + esc(inPortal(first.id)[0].sum) + '</span><span class="link sm">See guides ' + arrow() + '</span></a>'
-          + '<a class="wcard" href="contact.html"><span class="wic amber">' + ic('inbox') + '</span><b>Raise a request</b><span>' + esc(H.support.reply) + ' Track it here.</span><span class="link sm">New request ' + arrow() + '</span></a>'
-          + '<a class="wcard" href="portal.html?p=account"><span class="wic">' + ic('shield-check') + '</span><b>Account &amp; security</b><span>Sign-up, passwords, access and data safety.</span><span class="link sm">See guides ' + arrow() + '</span></a></div>'
-          + '<div class="cards2"><div class="panel-c"><div class="pc-h"><b>Continue learning</b><a class="link sm" href="#learning">All paths</a></div>' + (myPaths.length ? myPaths.map(function (pa) { return pathCard(pa, true); }).join('') : '<p class="muted">No paths for your portals yet.</p>') + '</div>'
-          + '<div class="panel-c"><div class="pc-h"><b>My requests</b><a class="link sm" href="#requests">View all</a></div>' + (rs.length ? rs.slice(0, 2).map(reqCard).join('') : '<div class="empty sm">' + ic('inbox') + '<p>No requests yet. When you contact support while signed in, it shows up here.</p><a class="btn sm" href="contact.html">Raise a request</a></div>') + '</div></div>'
-          + '<div class="panel-c faq-c"><div><b class="h3x">FAQs</b><p class="muted">Quick answers for ' + mine.map(function (p) { return esc(p.name); }).join(', ') + '. Can’t find yours? Write to <a href="mailto:' + H.support.email + '">' + H.support.email + '</a>.</p></div><div>' + faqs.map(function (a, i) { return '<details' + (i === 0 ? ' open' : '') + '><summary>' + esc(a.title) + '</summary><p>' + esc(a.sum) + ' <a href="article.html?a=' + a.id + '">Read the guide</a></p></details>'; }).join('') + '</div></div>'
-          + (rec.length ? '<div class="panel-c"><div class="pc-h"><b>Recently viewed</b></div><div class="alist">' + rec.map(function (a) { return artRow(a, true); }).join('') + '</div></div>' : '');
-      },
+    function saved() { return store.get('pvh_saved', []).map(A).filter(Boolean); }
+    var paths = H.paths.filter(function (pa) { return pa.p === p.id; });
+    var tabs = [['requests', 'My requests', function () { return reqs().length; }], ['saved', 'Saved guides', function () { return saved().length; }], ['progress', 'Reading progress', null]];
+    function date(iso) { try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } }
+    function topic(a) { var t = (P(a.p).topics || []).filter(function (x) { return x.id === a.t; })[0]; return t ? t.name : P(a.p).name; }
+    function empty(t, txt, href, cta) { return '<div class="my-empty"><b>' + t + '</b><p>' + txt + '</p><a class="btn" href="' + href + '">' + cta + '</a></div>'; }
+    var V = {
       requests: function () {
-        var rs = reqs();
-        return '<div class="ws-h"><h1>My requests</h1><a class="btn sm" href="contact.html">' + ic('plus') + 'New request</a></div>'
-          + (rs.length ? '<div class="rq-list">' + rs.map(reqCard).join('') + '</div><p class="note mt">Requests you send while signed in are listed here. Replies arrive by email. <button type="button" class="link sm" data-clear>Clear this list</button></p>'
-            : '<div class="empty">' + ic('inbox') + '<h2>No requests yet</h2><p>When you contact support while signed in, your request shows up here.</p><a class="btn" href="contact.html">Raise a request</a></div>');
+        var r = reqs();
+        return '<div class="my-h"><h2>Your requests</h2><a href="contact.html?portal=' + p.id + '">New request</a></div>'
+          + (r.length ? '<ul class="my-box">' + r.map(function (x) { return '<li><div><b>' + esc(x.topic) + '</b><span>' + esc(x.id) + ' · Sent ' + date(x.at) + '</span></div><span class="my-st' + (x.status === 'Resolved' ? ' ok' : '') + '">' + esc(x.status) + '</span></li>'; }).join('') + '</ul><p class="my-note">Replies arrive by email from ' + H.support.email + '. <button type="button" class="link" id="my-clear">Clear this list</button></p>'
+            : empty('No requests yet', 'When you contact support while signed in, your request shows up here with its ID.', 'contact.html?portal=' + p.id, 'Contact support'));
       },
       saved: function () {
-        var s = store.get('pvh_saved', []).map(A).filter(Boolean);
-        return '<div class="ws-h"><h1>Saved guides</h1></div>' + (s.length ? '<div class="alist">' + s.map(function (a) { return artRow(a, true); }).join('') + '</div>'
-          : '<div class="empty">' + ic('bookmark') + '<h2>Nothing saved yet</h2><p>Use <b>Save</b> on any guide to keep it here.</p><a class="btn" href="portal.html?p=' + mine[0].id + '">Browse ' + esc(mine[0].name) + ' guides</a></div>');
+        var s = saved();
+        return '<div class="my-h"><h2>Guides you saved</h2></div>'
+          + (s.length ? '<ul class="my-box">' + s.map(function (a) { return '<li><div><a href="article.html?a=' + a.id + '">' + esc(a.title) + '</a><span>' + esc(topic(a)) + '</span></div><button type="button" class="link" data-unsave="' + a.id + '">Remove<span class="sr"> ' + esc(a.title) + '</span></button></li>'; }).join('') + '</ul>'
+            : empty('Nothing saved yet', 'Use <b>Save</b> at the top of any guide to keep it here.', 'portal.html?p=' + p.id, 'Browse ' + esc(p.name) + ' guides'));
       },
-      learning: function () {
-        var mp = H.paths.filter(function (pa) { return u.portals.indexOf(pa.p) > -1; }), other = H.paths.filter(function (pa) { return u.portals.indexOf(pa.p) < 0; });
-        return '<div class="ws-h"><h1>Learning paths</h1><a class="link sm" href="videos.html">Videos ' + arrow() + '</a></div><div class="cards2">' + mp.map(function (pa) { return pathCard(pa, false); }).join('') + '</div>'
-          + (other.length ? '<h2 class="h3x mt2 mb">Other portals</h2><div class="cards2">' + other.map(function (pa) { return pathCard(pa, false); }).join('') + '</div>' : '');
+      progress: function () {
+        if (!paths.length) return empty('No reading path yet', 'Guides for ' + esc(p.name) + ' are listed by topic.', 'portal.html?p=' + p.id, 'Browse ' + esc(p.name) + ' guides');
+        return paths.map(function (pa) {
+          var d = pa.steps.filter(function (x) { return read.indexOf(x) > -1; }).length, n = pa.steps.length, nx = pa.steps.filter(function (x) { return read.indexOf(x) < 0; })[0], pc = Math.round(d / n * 100);
+          return '<div class="my-h"><h2>' + esc(pa.title) + '</h2></div><div class="my-box my-pr"><div class="my-bar" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + esc(pa.title) + '"><i style="width:' + pc + '%"></i></div>'
+            + '<p>' + d + ' of ' + n + ' guides read' + (nx ? ' · Next: ' + esc(A(nx).title) : ' · All done') + '</p>' + (nx ? '<a class="btn" href="article.html?a=' + nx + '">' + (d ? 'Continue' : 'Start') + ' ' + arrow() + '</a>' : '')
+            + '<ol class="my-steps">' + pa.steps.map(function (x) { var done = read.indexOf(x) > -1; return '<li' + (done ? ' class="done"' : '') + '><a href="article.html?a=' + x + '">' + esc(A(x).title) + '</a>' + (done ? '<span>Read</span>' : '') + '</li>'; }).join('') + '</ol></div>';
+        }).join('');
       }
     };
-    function wireReq() { var c = main.querySelector('[data-clear]'); if (c) c.addEventListener('click', function () { store.set('pvh_requests', []); view('requests'); }); }
-    window.addEventListener('hashchange', function () { view(location.hash.slice(1)); });
-    view(location.hash.slice(1));
+    set('<div class="ptl my">'
+      + '<nav class="ptl-crumb" aria-label="Breadcrumb"><a href="index.html">Help</a><span aria-hidden="true">›</span><span aria-current="page">My help</span></nav>'
+      + '<div><h1>My help</h1><div class="my-who"><span>' + esc(u.email) + ' <span class="my-pill">' + esc(p.name) + ' account</span></span>' + (p.url ? '<a class="btn ghost" href="' + p.url + '" target="_blank" rel="noopener">Open ' + esc(p.name) + ' ' + ic('external-link') + '</a>' : '') + '</div></div>'
+      + '<div class="my-tabs" role="tablist" aria-label="My help">' + tabs.map(function (t) { return '<button type="button" role="tab" id="tab-' + t[0] + '" aria-controls="my-panel" data-t="' + t[0] + '">' + t[1] + '<em id="n-' + t[0] + '"></em></button>'; }).join('') + '</div>'
+      + '<div id="my-panel" role="tabpanel" tabindex="0"></div>'
+      + '<p class="my-foot"><a href="portal.html?p=account">Account &amp; security help</a> · <button type="button" class="link" data-signout>Sign out</button></p></div>');
+    var btns = [].slice.call(main.querySelectorAll('[role=tab]'));
+    function counts() { tabs.forEach(function (t) { var el = document.getElementById('n-' + t[0]); el.textContent = t[2] ? ' ' + t[2]() : ''; }); }
+    function show(v, focus) {
+      if (v === 'learning') v = 'progress';
+      if (!V[v]) v = reqs().length ? 'requests' : saved().length ? 'saved' : 'requests';
+      btns.forEach(function (b) { var on = b.dataset.t === v; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); if (on && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
+      var pn = document.getElementById('my-panel'); pn.setAttribute('aria-labelledby', 'tab-' + v); pn.innerHTML = V[v](); icons(); counts();
+      var c = document.getElementById('my-clear'); if (c) c.addEventListener('click', function () { store.set('pvh_requests', []); show('requests'); });
+      [].forEach.call(pn.querySelectorAll('[data-unsave]'), function (x) { x.addEventListener('click', function () { store.set('pvh_saved', store.get('pvh_saved', []).filter(function (id) { return id !== x.dataset.unsave; })); show('saved'); }); });
+      history.replaceState(null, '', 'my.html#' + v);
+    }
+    btns.forEach(function (b, i) {
+      b.addEventListener('click', function () { show(b.dataset.t); });
+      b.addEventListener('keydown', function (e) { var k = e.key, j = k === 'ArrowRight' ? i + 1 : k === 'ArrowLeft' ? i - 1 : k === 'Home' ? 0 : k === 'End' ? btns.length - 1 : null; if (j === null) return; e.preventDefault(); show(btns[(j + btns.length) % btns.length].dataset.t, true); });
+    });
+    var so = main.querySelector('.my-foot [data-signout]'); if (so) so.addEventListener('click', function () { try { localStorage.removeItem('pvh_user'); } catch (e) { } location.href = 'index.html'; });
+    window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+    show(location.hash.slice(1));
   };
 
   R['404'] = function () {
     title('Page not found');
-    set('<section class="sec"><div class="wrap narrow-w"><div class="empty big">' + ic('map-pin-off') + '<span class="eyebrow">404</span><h1>We couldn’t find that page.</h1><p>It may have moved. Search, or start from your portal.</p>' + searchBox({}) + '<div class="chips">' + H.portals.slice(0, 6).map(function (p) { return '<a class="chip" href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a>'; }).join('') + '</div></div></div></section>');
+    var bad = location.pathname + location.search;
+    function row(a) { var p = P(a.p), t = (p.topics || []).filter(function (x) { return x.id === a.t; })[0]; return '<li><a class="sr-r" href="article.html?a=' + a.id + '"><span class="sr-tag">' + esc(p.name) + (t ? '<i> · ' + esc(t.name) + '</i>' : '') + '</span><b>' + esc(a.title) + '</b></a></li>'; }
+    set('<div class="ptl sr-pg nf">'
+      + '<div><span class="nf-code">Error 404</span><h1 class="sr-h">We can’t find that page</h1><p class="ct-lead">The link may be old or mistyped. Search for what you need, or start with a popular guide.</p></div>'
+      + searchBox({ ph: 'Search all pvNXT help' })
+      + '<h2 class="sr-sub">Popular guides</h2><ul class="sr-list">' + H.popular.slice(0, 5).map(function (id) { return A(id); }).filter(Boolean).map(row).join('') + '</ul>'
+      + '<div class="sr-stuck"><div><b>Followed a link from a pvNXT portal?</b><span>Tell us where it was so we can fix it.</span></div><a class="btn" href="contact.html?topic=' + encodeURIComponent('Broken link: ' + bad) + '">Report a broken link</a></div></div>');
     wireSuggest();
   };
 
+
   layout();
+  chatWidget();
+  /* option C: soft glow follows the cursor on portal tiles */
+  if (window.matchMedia && matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches) {
+    document.addEventListener('pointermove', function (e) { var t = e.target.closest && e.target.closest('.mp a'); if (!t) return; var r = t.getBoundingClientRect(); t.style.setProperty('--gx', (e.clientX - r.left) + 'px'); t.style.setProperty('--gy', (e.clientY - r.top) + 'px'); }, { passive: true });
+  }
   (R[page] || R['404'])();
   wireSuggest();
   icons(); window.addEventListener('load', icons);

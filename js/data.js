@@ -354,6 +354,13 @@ window.HELP = {
         ['tip', 'Forgot it? <a href="article.html?a=reset-password">Reset your password</a>.']] }
   ],
 
+  /* Where each portal's guides come from. Shown at the end of every guide in that portal. */
+  sources: {
+    studio: { doc: 'pvNXT Studio user guide', updated: '30 Oct 2026' },
+    go: { doc: 'pvNXT Go user guide', updated: '30 Oct 2026' },
+    connect: { doc: 'pvNXT Connect user guide', updated: '30 Oct 2026' }
+  },
+
   /* Popular on the home page, in order */
   popular: ['studio-add-lead', 'go-verify-account', 'connect-create-project', 'studio-roof-analysis', 'connect-install-path', 'reset-password'],
 
