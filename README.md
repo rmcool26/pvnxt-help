@@ -19,7 +19,7 @@ Built on the terranxt.com design system: `css/styles.css` is copied unchanged fr
 | My help | `my.html#requests`, `#saved`, `#progress` | Tabs: requests, saved guides, reading progress |
 | 404 | `404.html` | Search, popular guides, "Report a broken link" |
 
-Portal ids: `atlas`, `studio`, `go`, `connect`, `scada`, `artha`, `apps`, `account`.
+Portal ids: `atlas`, `studio`, `go`, `connect`, `scada`, `artha`, `account` (Account & billing). There is no `apps` portal any more.
 
 ## Edit content
 
@@ -32,6 +32,12 @@ Everything is in `js/data.js`:
 **Studio, Go and Connect guides** come from the official step-by-step user guides (Oct 2026), with their screenshots in `assets/guides/<portal>/`. Names, emails, phone numbers, addresses and card details in those screenshots are blurred, because this site is public. To redo a screenshot, replace the file with the same name. Add one to a guide with `['img', 'studio/file.jpg', 'Caption']`.
 
 Atlas, SCADA, Artha, Apps and Account guides were drafted from terranxt.com. **Have those portal owners check the steps against the live UI before launch.**
+
+## Update 31 Oct 2026
+- **Videos**: the 14 real videos from "Features of pvNXT Application" are in `videos` in `js/data.js` (field `url`). They are SharePoint links: share each as "Anyone with the link" or move them to YouTube (unlisted) so public visitors can watch without signing in.
+- **No "Mobile apps" portal**: every portal has Android and iOS apps; portal pages say "Get the <portal> app"; one guide `get-the-app`.
+- **Account & billing** (was Account & security) with payment questions. Please have finance/support confirm: `billing-problem`, `billing-invoice`, `account-details`, `account-close`.
+- **Polish** (`js/polish.js`, `css/polish.css`): faint Unsplash photo behind portal titles (credited, hotlinked), "Get the app" link, dark footer (hours, phone, email, Contact us), Play/View cursor on desktop, photo on 404.
 
 ## Images
 
@@ -64,3 +70,9 @@ Static files, no build step. On Vercel: import the folder (or repo), framework "
 2. Connect a helpdesk (Freshdesk, Zoho Desk or similar) for requests and replies.
 3. Replace demo sign-in with pvNXT SSO.
 4. Record the demo videos and add their YouTube IDs.
+
+### Fixes 31 Oct 2026 (evening)
+- Home search results now drop over the portal tiles (the hero no longer clips them) and scroll inside the box on short screens.
+- Hero dot pattern is visible again: slow drift plus a soft teal glow behind the search. Stops when "reduce motion" is on.
+- Back to top button is back: it stacks above "Ask us" on the same edge (web and mobile, flips for Arabic), drops into the corner on phones when "Ask us" steps away or on pages without it, and hides while the chat is open.
+- Mobile footer: two columns per row instead of four squeezed ones.

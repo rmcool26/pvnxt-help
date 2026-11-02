@@ -215,7 +215,7 @@
     var f = '<footer class="ftr"><div class="wrap ftr-main"><div class="ftr-cols">'
       + '<div class="ftr-brand"><a class="logo" href="index.html"><img src="assets/logos/terranxt.png" alt="Terranxt"></a><p class="ftr-tag">Guides for Studio, Go, Connect, SCADA and Artha.</p><address>' + esc(H.support.hours) + '<br><a href="mailto:' + H.support.email + '">' + H.support.email + '</a><br>' + esc(H.support.reply) + '</address></div>'
       + '<div><h6>Portals</h6><ul>' + H.portals.slice(0, 6).map(function (p) { return '<li><a href="portal.html?p=' + p.id + '">' + esc(p.name) + '</a></li>'; }).join('') + '</ul></div>'
-      + '<div><h6>Help</h6><ul><li><a href="portal.html?p=account">Account &amp; security</a></li><li><a href="portal.html?p=apps">Mobile apps</a></li><li><a href="videos.html">Videos</a></li><li><a href="status.html">Status</a></li><li><a href="contact.html">Contact support</a></li></ul></div>'
+      + '<div><h6>Help</h6><ul><li><a href="portal.html?p=account">Account &amp; security</a></li><li><a href="article.html?a=get-the-app">Get the app</a></li><li><a href="videos.html">Videos</a></li><li><a href="status.html">Status</a></li><li><a href="contact.html">Contact support</a></li></ul></div>'
       + '<div><h6>You</h6><ul>' + (user() ? '<li><a href="my.html">My help</a></li><li><a href="my.html#requests">My requests</a></li><li><a href="my.html#saved">Saved guides</a></li>' : '<li><a href="signin.html">Sign in</a></li>') + '</ul></div>'
       + '<div><h6>Terranxt</h6><ul><li><a href="' + H.support.site + '" target="_blank" rel="noopener">terranxt.com</a></li><li><a href="' + H.support.site + '/how-it-works.html" target="_blank" rel="noopener">How it works</a></li><li><a href="' + H.support.demo + '" target="_blank" rel="noopener">Request a demo</a></li><li><a href="' + H.support.site + '/privacy.html" target="_blank" rel="noopener">Privacy</a></li><li><a href="' + H.support.site + '/terms.html" target="_blank" rel="noopener">Terms</a></li></ul></div>'
       + '</div><div class="ftr-base"><span>© ' + new Date().getFullYear() + ' Terranxt Pvt Ltd. A pvNXT company. IIT Delhi–FITT incubated. Backed by Astongreens.</span><span>Screenshots are from the live portals. Personal details are blurred.</span></div></div></footer>';
@@ -330,7 +330,7 @@
       + '</div></section>'
 
       + '<nav class="mp" aria-label="Portals"><div class="mp-in">'
-      + ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'apps', 'account'].map(P).map(function (p) { return '<a href="portal.html?p=' + p.id + '"><span class="mp-i">' + ic(p.icon) + '</span><span>' + esc(p.id === 'apps' ? 'Mobile apps' : p.id === 'account' ? 'Account' : p.name) + '</span></a>'; }).join('')
+      + ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'account'].map(P).filter(Boolean).map(function (p) { return '<a href="portal.html?p=' + p.id + '"><span class="mp-i">' + ic(p.icon) + '</span><span>' + esc(p.name) + '</span></a>'; }).join('')
       + '</div></nav>'
 
       + '<section class="mq" aria-labelledby="mq-h"><div class="mq-in">'
@@ -341,7 +341,7 @@
 
       + '<section class="ml"><div class="ml-in">'
       + '<div><h3>Your account</h3><a href="article.html?a=reset-password">Reset your password</a><a href="article.html?a=which-portal">Which portal is mine?</a><a href="' + (user() ? 'my.html' : 'signin.html?next=my.html') + '">' + (user() ? 'My requests and saved guides' : 'Sign in to track requests') + '</a></div>'
-      + '<div><h3>Learn</h3><a href="videos.html">Videos and learning paths</a><a href="portal.html?p=apps">Mobile apps</a><a href="status.html">Portal status</a></div>'
+      + '<div><h3>Learn</h3><a href="videos.html">Videos and learning paths</a><a href="article.html?a=get-the-app">Get the app</a><a href="status.html">Portal status</a></div>'
       + '<div><h3>Talk to a person</h3><p>We reply within one working day.</p><a href="contact.html">Contact support</a><a href="' + H.support.whatsapp + '" target="_blank" rel="noopener">WhatsApp, ' + esc(H.support.hours) + '</a></div>'
       + '</div></section>'
     );
@@ -428,7 +428,7 @@
     var read = store.get('pvh_read', []); if (read.indexOf(a.id) < 0) { read.push(a.id); store.set('pvh_read', read); }
     var recent = store.get('pvh_recent', []).filter(function (x) { return x !== a.id; }); recent.unshift(a.id); store.set('pvh_recent', recent.slice(0, 8));
     var isSaved = store.get('pvh_saved', []).indexOf(a.id) > -1;
-    var vid = a.video ? V(a.video) : null, topic = p.topics.filter(function (t) { return t.id === a.t; })[0];
+    var vid = a.video ? V(a.video) : H.videos.filter(function (v) { return v.article === a.id && v.url; })[0], topic = p.topics.filter(function (t) { return t.id === a.t; })[0];
     var prev = list[i - 1], next = list[i + 1], src = (H.sources || {})[p.id];
     var hs = a.body.filter(function (b) { return b[0] === 'h'; }), numbered = hs.length > 1;
     var navList = p.topics.map(function (t) { return '<p class="gn-h">' + esc(t.name) + '</p><ul>' + list.filter(function (x) { return x.t === t.id; }).map(function (x) { return '<li><a href="article.html?a=' + x.id + '"' + (x.id === a.id ? ' aria-current="page"' : '') + '>' + esc(x.title) + '</a></li>'; }).join('') + '</ul>'; }).join('');
@@ -446,7 +446,7 @@
       + (numbered ? '<nav class="gb-sec" aria-label="In this guide"><span class="gb-l">In this guide</span>' + hs.map(function (b, k) { return '<a href="#' + slug(b[1]) + '"><i>' + (k + 1) + '</i>' + strip(b[1]) + '</a>'; }).join('') + '</nav>' : '<span class="gb-l gb-one">' + esc(topic ? topic.name : '') + '</span>')
       + '<span class="gb-prog" aria-hidden="true"><i></i></span></div>'
       + '<div class="art-body gb-body">' + a.body.map(block).join('') + '</div>'
-      + (vid && vid.yt ? '<button type="button" class="art-vid" data-video="' + vid.id + '">' + shot(vThumb(vid)) + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video</span><b>' + esc(vid.title) + '</b></span></button>' : '')
+      + (vid && vid.url ? '<a class="art-vid" href="' + esc(vid.url) + '" target="_blank" rel="noopener">' + shot(vThumb(vid)) + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video · opens in a new tab</span><b>' + esc(vid.title) + '</b></span></a>' : '') + (vid && vid.yt ? '<button type="button" class="art-vid" data-video="' + vid.id + '">' + shot(vThumb(vid)) + '<span class="vplay">' + ic('play') + '</span><span class="art-vid-t"><span class="tg">Video</span><b>' + esc(vid.title) + '</b></span></button>' : '')
       + '<div class="ga-foot"><div class="ga-fb" data-fb><span>Was this helpful?</span><span class="fb-b"><button type="button" data-v="yes">' + ic('thumbs-up') + 'Yes</button><button type="button" data-v="no">' + ic('thumbs-down') + 'No</button></span><span class="fb-ok" hidden></span></div>'
       + '<span class="ga-upd">' + (src ? 'From the ' + esc(src.doc) + ' · ' : '') + '<a href="contact.html?portal=' + p.id + '&topic=' + encodeURIComponent(a.title) + '">Still stuck? Contact support</a></span></div>'
       + (next ? '<a class="gb-next" href="article.html?a=' + next.id + '"><span><em>Next guide · ' + (i + 2) + ' of ' + list.length + '</em><b>' + esc(next.title) + '</b></span>' + ic('arrow-right') + '</a>' : '<a class="gb-next" href="portal.html?p=' + p.id + '"><span><em>You’ve reached the last ' + esc(p.name) + ' guide</em><b>Back to ' + esc(p.name) + ' help</b></span>' + ic('arrow-right') + '</a>')
@@ -512,11 +512,11 @@
       var v = cur, a = A(v.article), t = vThumb(v), L = list(), i = L.indexOf(v), nx = L[i + 1];
       var secs = a ? a.body.filter(function (x) { return x[0] === 'h'; }).map(function (x) { return x[1]; }) : [];
       var poster = '<div class="vp-play">' + (t ? '<img src="' + t + '" alt="">' : '<span class="vp-blank">' + ic(v.p === 'all' ? 'layers' : P(v.p).icon) + '</span>')
-        + (v.yt ? '<button type="button" class="vp-btn" id="vp-go" aria-label="Play: ' + esc(v.title) + '">' + ic('play') + '</button>'
+        + (v.url ? '<a class="vp-btn" href="' + esc(v.url) + '" target="_blank" rel="noopener" aria-label="Watch: ' + esc(v.title) + ' (opens in a new tab)">' + ic('play') + '</a><a class="vp-ext" href="' + esc(v.url) + '" target="_blank" rel="noopener">Watch video ' + ic('external-link') + '</a>' : v.yt ? '<button type="button" class="vp-btn" id="vp-go" aria-label="Play: ' + esc(v.title) + '">' + ic('play') + '</button>'
                 : '<div class="vp-soon"><b>Video coming soon</b><span>The written guide has the same steps, with screenshots.</span>' + (a ? '<a class="btn" href="article.html?a=' + a.id + '">Read the guide ' + arrow() + '</a>' : '') + '</div>') + '</div>';
       document.getElementById('vp-main').innerHTML = poster
-        + '<h2 class="vp-t">' + esc(v.title) + '</h2><p class="vp-m">' + esc(pn(v)) + (i > -1 ? ' · ' + (i + 1) + ' of ' + L.length : '') + (a ? ' · <a href="article.html?a=' + a.id + '">Read the guide</a>' : '') + '</p>'
-        + (secs.length ? '<div class="vp-in"><b>' + (v.yt ? 'In this video' : 'What it will cover') + '</b><ol>' + secs.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ol></div>' : (a ? '<p class="vp-m">' + esc(a.sum) + '</p>' : ''))
+        + '<h2 class="vp-t">' + esc(v.title) + '</h2>' + (v.sum ? '<p class="vp-d">' + esc(v.sum) + '</p>' : '') + '<p class="vp-m">' + esc(pn(v)) + (i > -1 ? ' · ' + (i + 1) + ' of ' + L.length : '') + (a ? ' · <a href="article.html?a=' + a.id + '">Read the guide</a>' : '') + '</p>'
+        + (secs.length ? '<div class="vp-in"><b>' + (v.yt || v.url ? 'Steps in the written guide' : 'What it will cover') + '</b><ol>' + secs.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ol></div>' : (a ? '<p class="vp-m">' + esc(a.sum) + '</p>' : ''))
         + '<div class="vp-nav">' + (nx ? '<button type="button" class="btn ghost" data-v="' + nx.id + '">Next video: ' + esc(nx.title) + ' ' + arrow() + '</button>' : '') + '</div>';
       var go = document.getElementById('vp-go');
       if (go) go.addEventListener('click', function () { var box = go.parentNode; box.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(v.yt) + '?autoplay=1&rel=0" title="' + esc(v.title) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'; });
@@ -526,7 +526,7 @@
     function drawList() {
       var L = list(), i = L.indexOf(cur);
       document.getElementById('vp-sum').textContent = 'All videos · ' + (i > -1 ? (i + 1) + ' of ' + L.length : L.length);
-      document.getElementById('vp-ol').innerHTML = L.map(function (v, k) { return '<li><button type="button" data-v="' + v.id + '"' + (v === cur ? ' aria-current="true"' : '') + '><span class="vp-n">' + (k + 1) + '</span><span><b>' + esc(v.title) + '</b><span>' + esc(pn(v)) + (v.yt ? '' : ' · Coming soon') + '</span></span></button></li>'; }).join('');
+      document.getElementById('vp-ol').innerHTML = L.map(function (v, k) { return '<li><button type="button" data-v="' + v.id + '"' + (v === cur ? ' aria-current="true"' : '') + '><span class="vp-n">' + (k + 1) + '</span><span><b>' + esc(v.title) + '</b><span>' + esc(pn(v)) + (v.yt || v.url ? '' : ' · Coming soon') + '</span></span></button></li>'; }).join('');
       wireV(document.getElementById('vp-ol'));
       [].forEach.call(main.querySelectorAll('[data-f]'), function (b) { b.setAttribute('aria-pressed', b.dataset.f === filt); });
     }
@@ -550,7 +550,7 @@
 
   R.guides = function () {
     title('All guides');
-    var order = ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'apps', 'account'];
+    var order = ['studio', 'go', 'connect', 'scada', 'atlas', 'artha', 'account'];
     var ps = order.map(P).filter(function (p) { return p && inPortal(p.id).length; });
     function pick() { var h = (location.hash || '').slice(1); return ps.some(function (p) { return p.id === h; }) ? h : 'studio'; }
     var cur = pick();

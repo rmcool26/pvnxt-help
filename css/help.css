@@ -1200,3 +1200,9 @@ html,body{background:#fff}
   .gx-t li b{font-size:16px}
 }
 @media (prefers-reduced-motion:no-preference){.gx-main>*{animation:mo-fade .18s ease both}}
+
+/* real video links */
+.vp-ext{position:absolute;right:14px;bottom:14px;z-index:2;display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:99px;padding:8px 14px;font:600 14px var(--f-body);color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.vp-ext svg{width:15px;height:15px}
+a.vp-btn{color:#fff}
+.vp-d{margin:2px 0 6px;font-size:15.5px;color:#3c5459}

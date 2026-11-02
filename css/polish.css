@@ -1,0 +1,104 @@
+/* pvNXT Help polish (prefix sg-) */
+/* photos */
+.sg-ph{position:relative;margin:0;overflow:hidden;background:linear-gradient(135deg,#dbe9ec,#eef5f6)}
+.sg-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.sg-fb{position:absolute;inset:0;display:grid;place-items:center;padding:12px;text-align:center;font:600 13px var(--f-body);color:#065f6b}
+.sg-ph figcaption{position:absolute;right:10px;bottom:6px;z-index:2;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.sg-ph figcaption a{color:#fff;text-decoration:underline}
+/* portal head: faint real photo behind + preview on the right */
+.ptl.sg-pt{position:relative;isolation:isolate}
+.sg-wide{position:absolute!important;left:calc(50% - 50vw);right:calc(50% - 50vw);top:0;height:330px;z-index:-1}
+.sg-wide img{opacity:.55}
+.sg-wide::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.55) 0,rgba(255,255,255,.72) 55%,#fff 100%)}
+.sg-wide figcaption{top:8px;bottom:auto;color:#3c5459;text-shadow:none}.sg-wide figcaption a{color:#3c5459}
+.ptl-head.sg-hd{display:grid;grid-template-columns:auto minmax(0,1fr) 260px;gap:18px;align-items:center}
+.sg-hclip{display:flex;flex-direction:column;gap:6px}.sg-hclip a{font:600 13.5px var(--f-body)}
+/* videos page */
+.vp-play.sg-vp .vp-soon{z-index:2}
+/* 404 + empty */
+.nf.sg-nf{display:grid;grid-template-columns:200px minmax(0,1fr);gap:28px;align-items:start}
+.nf.sg-nf>*:not(.sg-ph){grid-column:2}.nf.sg-nf>.sg-ph{grid-column:1;grid-row:1/span 6}
+.sg-sq{aspect-ratio:1/1;border-radius:18px}
+.sg-mini{width:140px;aspect-ratio:4/3;border-radius:12px;margin-bottom:8px}
+/* dark footer with the contact CTA inside */
+.sg-ft{background:var(--ink);color:#d6e6e9;padding:44px max(16px,env(safe-area-inset-left,0px)) 24px;margin-top:40px}
+.sg-fin{max-width:1088px;margin:0 auto;display:grid;grid-template-columns:1.6fr repeat(4,minmax(0,1fr));gap:28px}
+.sg-logo{display:inline-flex;align-items:center;gap:8px;font:700 17px var(--f-head);color:#fff}.sg-logo img{width:22px;height:22px}
+.sg-tag{margin:10px 0 0;font:600 15px var(--f-body);color:#fff}.sg-meta{margin:8px 0 0;font-size:14px;line-height:1.75;color:#b9cfd3}
+.sg-meta a{color:#e6f1f2}
+.sg-cta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}.sg-cta b{width:100%;font:600 13px var(--f-body);color:#7fd6e0;letter-spacing:.04em;text-transform:uppercase}
+.sg-bt{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border-radius:99px;border:1px solid rgba(255,255,255,.35);color:#fff;font:600 14px var(--f-body);text-decoration:none}
+.sg-bt:hover{background:#fff;color:var(--ink);border-color:#fff}
+.sg-fc{display:flex;flex-direction:column;gap:2px}.sg-fc h6{font:600 12px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:#7fd6e0;margin:0 0 6px}
+.sg-fc a{font-size:14.5px;color:#e6f1f2;min-height:32px;display:inline-flex;align-items:center}.sg-fc a:hover{text-decoration:underline}
+.sg-ft a:focus-visible{outline:2px solid #7fd6e0;outline-offset:2px}
+.sg-base{max-width:1088px;margin:26px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.15);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;font-size:13px;color:#b9cfd3}
+/* cursor */
+.sg-cur i{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;display:block}
+.sg-cur .d{width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--teal)}
+.sg-cur .r{width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:1.5px solid rgba(6,159,177,.55);display:grid;place-items:center;transition:width .18s,height .18s,margin .18s,background .18s}
+.sg-cur .r span{font:600 11px var(--f-body);color:#fff}
+.sg-cur .r.big{width:46px;height:46px;margin:-23px 0 0 -23px;background:rgba(6,159,177,.08)}
+.sg-cur .r.lab{width:60px;height:60px;margin:-30px 0 0 -30px;background:var(--ink);border-color:var(--ink)}
+.sg-cur.hide i{opacity:0}
+.sg-final .mf{display:none}
+@media(max-width:900px){
+    .ptl-head.sg-hd{grid-template-columns:auto minmax(0,1fr)}.sg-hclip{grid-column:1/-1}
+  .sg-fin{grid-template-columns:1fr 1fr}.sg-fbrand{grid-column:1/-1}
+  .nf.sg-nf{grid-template-columns:1fr}.nf.sg-nf>*{grid-column:1!important;grid-row:auto!important}.nf.sg-nf>.sg-ph{width:140px}
+}
+@media(max-width:600px){.sg-wide{height:260px}}
+@media (prefers-reduced-motion:reduce){.sg-play,.sg-cur .r{transition:none}}
+.sg-wide .sg-fb{place-items:start end;padding:34px 18px;font-size:12px;font-weight:500;color:#5b7176;text-align:right}
+
+/* merged v3 */
+.sg-app{display:inline-flex;margin-top:8px;font:600 13.5px var(--f-body);color:var(--teal-dd);text-decoration:underline;text-underline-offset:2px}
+.sg-fin{grid-template-columns:1.1fr repeat(4,minmax(0,1fr))}
+.sg-tag{font:400 14.5px var(--f-body);color:#b9cfd3;margin-top:8px}
+.sg-hrs{margin-top:6px;font-size:13px;line-height:1.6;color:#b9cfd3}
+.sg-logo{text-decoration:none}
+/* 7 portal tiles: centre the last row */
+.sg-final .mp-in{display:flex;flex-wrap:wrap;justify-content:center}
+.sg-final .mp-in>a{flex:0 0 calc(25% - 3px)}
+@media(max-width:560px){.sg-final .mp-in>a{flex:0 0 calc(50% - 2px)}}
+
+.sg-ct{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:14px;color:#d6e6e9}
+.sg-ct span{display:block;font:600 11.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:#7fd6e0;margin-bottom:2px}
+.sg-ct a{color:#e6f1f2;text-decoration:none}.sg-ct a:hover{text-decoration:underline}
+.sg-app{min-height:40px;align-items:center}
+.gb-body p a,.gb-body li a,.gb-body .tip a,.gb-body .note a{text-decoration:underline;text-underline-offset:2px}
+.cx-fab{box-shadow:0 0 0 2px rgba(255,255,255,.9),0 6px 20px rgba(11,42,48,.25)}
+
+/* ===== Fix 31 Oct: home search results, hero pattern, back to top ===== */
+/* 1. search results drop over the portal tiles instead of being clipped by the hero */
+.mh{overflow:visible;z-index:3}
+.mp{position:relative;z-index:1}
+.mh .sugg{z-index:60;max-height:max(220px,min(440px,calc(100vh - 330px)));overflow-y:auto;overscroll-behavior:contain}
+/* 2. hero pattern: visible slow drift + a soft teal glow that breathes behind the search */
+.mh-grid{inset:-24px 0 -150px;opacity:.42;background-size:20px 20px;
+  -webkit-mask-image:radial-gradient(ellipse 58% 62% at 50% 42%,#000 18%,transparent 74%);mask-image:radial-gradient(ellipse 58% 62% at 50% 42%,#000 18%,transparent 74%)}
+.mh-grid::after{content:"";position:absolute;left:50%;top:42%;width:min(720px,90vw);height:300px;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(6,159,177,.16),transparent);opacity:.6}
+@media (prefers-reduced-motion:no-preference){
+  .mh-grid{animation:mo-drift 22s linear infinite}
+  .mh-grid::after{animation:sg-breathe 7s ease-in-out infinite}
+}
+@keyframes sg-breathe{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(.94)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}}
+@media (max-width:560px){.mh-grid{inset:-16px 0 -80px;opacity:.36}}
+/* 3. back to top: stacked above "Ask us", same right edge, web and mobile */
+.to-top{display:grid!important;position:fixed;inset-inline-end:20px;inset-inline-start:auto;right:auto;bottom:80px;z-index:44;width:48px;height:48px;border:1px solid #c9dadd;background:#fff;color:var(--ink);box-shadow:0 6px 18px rgba(11,42,48,.12)}
+html:not([dir=rtl]) .to-top{right:20px}
+html[dir=rtl] .to-top{left:20px}
+.to-top:hover,.to-top:focus-visible{background:var(--ink);color:#fff;border-color:var(--ink)}
+.to-top:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+body.cx-on .to-top{opacity:0;visibility:hidden}
+@media (max-width:640px){
+  .to-top{width:44px;height:44px;bottom:80px}
+  html:not([dir=rtl]) .to-top{right:20px}html[dir=rtl] .to-top{left:20px}
+  .sg-fab-away .to-top{bottom:16px}
+}
+@media (prefers-reduced-motion:reduce){.to-top{transition:none}}
+/* footer on tablets and phones: brand on its own row, then two columns per row */
+@media (max-width:900px){.sg-fin{grid-template-columns:repeat(4,minmax(0,1fr))}.sg-fbrand{grid-column:1/-1}}
+@media (max-width:640px){.sg-fin{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 20px}.sg-ft{padding-bottom:96px}}
+.sg-no-fab .to-top{bottom:20px!important}
